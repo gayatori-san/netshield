@@ -118,3 +118,12 @@ class PcapSource:
         self._status.state = "error"
         self._status.error = message
         self._status.finished_at = time.time()
+
+
+def has_capture_signature(path: str | Path) -> bool:
+    """True if the first four bytes look like pcap or pcapng."""
+    try:
+        with Path(path).open("rb") as handle:
+            return handle.read(4) in _CAPTURE_SIGNATURES
+    except OSError:
+        return False
