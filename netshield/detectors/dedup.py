@@ -30,11 +30,23 @@ class AlertDeduplicator:
         raw = f"{rule_id}|{src_ip or '-'}|{dst_ip or '-'}|{self.bucket(window_end)}"
         return hashlib.sha256(raw.encode("utf-8")).hexdigest()[:32]
 
-    def should_emit(self, fingerprint: str, now: float) -> bool:
-        last = self._seen.get(fingerprint)
+    def should_emit(
+        self, fingerprint: str, now: float, identity: str | None = None
+    ) -> bool:
+        """Return True when this observation should become an incident.
+
+        ``fingerprint`` changes when a sliding window crosses a coarse time
+        bucket. Suppression therefore keys on ``identity`` (rule + addresses)
+        when provided, so one ongoing pattern cannot produce a second incident
+        merely because the bucket boundary moved. The fingerprint remains the
+        durable database key, so a genuinely new bucket can still be stored
+        after the suppression window.
+        """
+        key = identity or fingerprint
+        last = self._seen.get(key)
         if last is not None and (now - last) < self.suppression_seconds:
             return False
-        self._seen[fingerprint] = now
+        self._seen[key] = now
         self._prune(now)
         return True
 

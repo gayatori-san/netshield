@@ -110,7 +110,8 @@ class AlertScorer:
         )
 
     def should_emit(self, alert: Alert, now: float) -> bool:
-        return self.deduplicator.should_emit(alert.fingerprint, now)
+        identity = f"{alert.rule_id}|{alert.src_ip or '-'}|{alert.dst_ip or '-'}"
+        return self.deduplicator.should_emit(alert.fingerprint, now, identity=identity)
 
     def reset(self) -> None:
         self.deduplicator.reset()

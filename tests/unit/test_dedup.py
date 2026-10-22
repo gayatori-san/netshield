@@ -44,6 +44,16 @@ class TestSuppression:
         assert dedup.should_emit("a" * 32, 1.0) is True
         assert dedup.should_emit("b" * 32, 1.0) is True
 
+    def test_bucket_boundary_does_not_duplicate_an_ongoing_pattern(self):
+        dedup = AlertDeduplicator(300)
+        early = dedup.fingerprint("PORT_SCAN_PORTS", "10.0.0.1", "10.0.0.2", 299.0)
+        late = dedup.fingerprint("PORT_SCAN_PORTS", "10.0.0.1", "10.0.0.2", 301.0)
+        identity = "PORT_SCAN_PORTS|10.0.0.1|10.0.0.2"
+
+        assert early != late
+        assert dedup.should_emit(early, 299.0, identity=identity) is True
+        assert dedup.should_emit(late, 301.0, identity=identity) is False
+
     def test_reset_allows_reemission(self):
         dedup = AlertDeduplicator(300)
         assert dedup.should_emit("c" * 32, 1.0) is True
