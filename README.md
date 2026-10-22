@@ -1,18 +1,23 @@
-# NetShield — Network Attack Detection System
+# NetShield — Network Defense Web App
 
-Educational IDS mini-project using Python, Scapy, Flask, SQLite and Chart.js.
+NetShield is an educational web-based intrusion detection prototype built with Flask, SQLite, Scapy, and Chart.js. It includes a responsive dashboard, a synthetic safe demo, heuristic alert detection, alert triage, and offline PCAP uploads.
 
-## Features
-- Responsive dashboard and JSON API
-- Synthetic demonstration event generator (metadata only; no packets sent)
-- Offline PCAP parsing with Scapy
-- Heuristic detection for possible port scans and traffic spikes
-- SQLite event and alert storage
-- Alert acknowledgement and resolution
-- Basic automated test
+## Live deployment (Render)
 
-## Run
-Python 3.10+ recommended.
+This repository is ready for a Python web service deployment.
+
+1. Sign in to [Render](https://render.com/) and create a **New Web Service**.
+2. Connect this repository: `gayatori-san/netshield`.
+3. Use the repository root as **Root Directory** (leave it blank).
+4. Build command: `pip install -r requirements.txt`
+5. Start command: `gunicorn app:app`
+6. Deploy. Open the generated `onrender.com` URL and click **Run synthetic demo**.
+
+The `Procfile` also declares the Gunicorn start command for compatible hosts.
+
+## Run locally
+
+Python 3.10+ is recommended.
 
 ```bash
 python3 -m venv .venv
@@ -21,29 +26,32 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open http://127.0.0.1:5000 and click **Run synthetic demo**.
+Open http://127.0.0.1:5000.
 
-Windows activation: `.venv\\Scripts\\activate`.
+## Features
 
-## PCAP analysis
-Enter the full path to a PCAP file on the computer running the Flask process. It is parsed offline. Scapy must be installed.
+- Responsive web dashboard with event counts, alert counts, and severity chart.
+- Synthetic sample generation for safe end-to-end demonstration. It sends no packets.
+- Offline PCAP upload in the browser (PCAP/PCAPNG/CAP, maximum 32 MB).
+- Heuristics for possible port scans and unusually high event rates.
+- Alert status workflow: open, acknowledged, and resolved.
+- Health endpoint at `/api/health`.
 
-## Tests
-```bash
-pytest -q
-```
+## Deployment and storage notes
+
+The hosted demo uses SQLite. On the included Render-style web service, the default database file is local to the service instance; deployments and restarts may reset data depending on the host's filesystem policy. For durable production data, migrate the store to managed PostgreSQL. On Vercel, the app selects `/tmp/netshield.db` because serverless filesystems are ephemeral; it should be treated as a demo, not persistent storage.
+
+A PCAP upload is processed by the server, not by the visitor's computer. Files are held in memory, and NetShield does not enable live capture or blocking.
+
+## Detection limitations and safety
+
+- This project is a learning prototype, not a production IDS/SIEM.
+- Heuristic rules can generate false positives and false negatives.
+- A traffic spike alone does not prove a DDoS attack.
+- Live packet capture, active probing, and firewall blocking are not enabled.
+- Upload only traffic captures that you own or have explicit permission to analyze. PCAP files may contain sensitive information.
+- No accuracy claim is made without evaluation using a labelled dataset.
 
 ## Architecture
-PCAP or synthetic event metadata → parsing → detection heuristics → SQLite → Flask API → dashboard.
 
-## Safety and limitations
-- This is a starter IDS prototype, not a production security tool.
-- Detection uses simple heuristics and can generate false positives and false negatives.
-- A traffic spike alone does not prove a DDoS attack.
-- Live packet capture and firewall blocking are not enabled.
-- Use only systems and traffic you own or have explicit permission to inspect.
-- PCAP files can contain sensitive data; handle them responsibly.
-- No detection accuracy claim is made without evaluation against a labelled dataset.
-
-## Next improvements
-Improve alert deduplication, add flow aggregation and protocol charts, add more tests, and only then consider optional authorized live capture with explicit interface selection and a stop control.
+Browser dashboard → Flask API → heuristic engine → SQLite alert/event store. Uploaded PCAP bytes are parsed offline with Scapy and passed into the same detection engine.
