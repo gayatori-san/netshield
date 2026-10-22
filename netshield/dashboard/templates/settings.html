@@ -1,0 +1,238 @@
+{% extends "base.html" %}
+
+{% block title %}Settings · NetShield{% endblock %}
+{% block page_title %}Settings{% endblock %}
+{% block page_sub %}Tune detector thresholds for this session and review the response safety gates.{% endblock %}
+
+{% block content %}
+<div class="stack">
+
+  <div class="banner">
+    <span><strong>Session-scoped changes.</strong> Saving updates the running pipeline and is validated server-side, but it does not rewrite <span class="mono">config/thresholds.toml</span>. A restart restores the file values. Capture limits and the demo duration are deployment settings and stay read-only here.</span>
+  </div>
+
+  <form id="settingsForm" class="stack" novalidate>
+
+    <section class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Port scan</h2>
+            <p class="hint">Connection attempts (never replies) from one source across distinct ports or hosts.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="field">
+            <label for="ps-window">Window (seconds)</label>
+            <input type="number" id="ps-window" data-path="port_scan.window_seconds" data-kind="int" min="1" max="3600">
+          </div>
+          <div class="field">
+            <label for="ps-ports">Distinct port threshold</label>
+            <input type="number" id="ps-ports" data-path="port_scan.distinct_port_threshold" data-kind="int" min="2" max="65535">
+            <span class="help">A source touching this many ports inside the window raises PORT_SCAN_PORTS.</span>
+          </div>
+          <div class="field">
+            <label for="ps-hosts">Distinct host threshold</label>
+            <input type="number" id="ps-hosts" data-path="port_scan.distinct_host_threshold" data-kind="int" min="2" max="65535">
+            <span class="help">A source contacting this many hosts on one port raises PORT_SCAN_HOSTS.</span>
+          </div>
+          <div class="field">
+            <label for="ps-min">Minimum connections per target</label>
+            <input type="number" id="ps-min" data-path="port_scan.min_packets_per_target" data-kind="int" min="1" max="100000">
+            <span class="help">Evidence gate: below this count the finding is capped at medium.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Traffic spike</h2>
+            <p class="hint">Packets per second compared with an exponential moving baseline.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="field">
+            <label for="sp-window">Window (seconds)</label>
+            <input type="number" id="sp-window" data-path="spike.window_seconds" data-kind="int" min="1" max="3600">
+          </div>
+          <div class="field">
+            <label for="sp-base-window">Baseline window (seconds)</label>
+            <input type="number" id="sp-base-window" data-path="spike.baseline_window_seconds" data-kind="int" min="1" max="86400">
+          </div>
+          <div class="field">
+            <label for="sp-abs">Absolute threshold (packets/s)</label>
+            <input type="number" id="sp-abs" data-path="spike.spike_absolute_pps" data-kind="int" min="1" max="10000000">
+          </div>
+          <div class="field">
+            <label for="sp-ratio">Baseline ratio</label>
+            <input type="number" id="sp-ratio" data-path="spike.spike_baseline_ratio" data-kind="float" min="1" max="1000" step="0.1">
+            <span class="help">Rate must exceed baseline &times; ratio as well as the absolute floor.</span>
+          </div>
+          <div class="field">
+            <label for="sp-min">Minimum rate to consider (packets/s)</label>
+            <input type="number" id="sp-min" data-path="spike.spike_min_pps" data-kind="int" min="1" max="10000000">
+          </div>
+          <div class="field">
+            <label for="sp-alpha">Baseline smoothing alpha</label>
+            <input type="number" id="sp-alpha" data-path="spike.baseline_alpha" data-kind="float" min="0.01" max="1" step="0.01">
+          </div>
+          <div class="field">
+            <label for="sp-samples">Baseline minimum samples</label>
+            <input type="number" id="sp-samples" data-path="spike.baseline_min_samples" data-kind="int" min="1" max="10000">
+            <span class="help">Cold start: no baseline comparison until this many windows are seen.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid cols-2">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Repeated / suspicious activity</h2>
+            <p class="hint">SYN-only evidence: a bare SYN is an attempt, not a completed connection.</p>
+          </div>
+        </div>
+        <div class="stack">
+          <div class="field">
+            <label for="su-window">Window (seconds)</label>
+            <input type="number" id="su-window" data-path="suspicious.window_seconds" data-kind="int" min="1" max="3600">
+          </div>
+          <div class="field">
+            <label for="su-repeat">Repeat attempt threshold</label>
+            <input type="number" id="su-repeat" data-path="suspicious.repeat_attempt_threshold" data-kind="int" min="2" max="100000">
+            <span class="help">Unanswered SYNs to the same destination raise REPEATED_CONNECTIONS.</span>
+          </div>
+          <div class="field">
+            <label for="su-rate">Connection rate threshold (per window)</label>
+            <input type="number" id="su-rate" data-path="suspicious.conn_rate_threshold" data-kind="int" min="1" max="1000000">
+          </div>
+          <div class="field">
+            <label for="su-mult">Connection rate multiplier</label>
+            <input type="number" id="su-mult" data-path="suspicious.conn_rate_multiplier" data-kind="float" min="1" max="100" step="0.1">
+          </div>
+          <div class="field">
+            <label for="su-alpha">Rate baseline alpha</label>
+            <input type="number" id="su-alpha" data-path="suspicious.conn_baseline_alpha" data-kind="float" min="0.01" max="1" step="0.01">
+          </div>
+          <div class="field">
+            <label for="su-samples">Rate baseline minimum samples</label>
+            <input type="number" id="su-samples" data-path="suspicious.conn_baseline_min_samples" data-kind="int" min="1" max="10000">
+          </div>
+          <div class="field">
+            <label for="su-ports">Sensitive ports</label>
+            <textarea id="su-ports" rows="3" data-path="suspicious.sensitive_ports" data-kind="ports"></textarea>
+            <span class="help">Comma or whitespace separated. A SYN to any listed port raises SENSITIVE_PORT.</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="stack">
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Scoring bands</h2>
+              <p class="hint">Score = rule base + volume bonus + recurrence bonus, clamped to 0–100.</p>
+            </div>
+          </div>
+          <div class="grid cols-2">
+            <div class="field">
+              <label for="sc-low">Low maximum</label>
+              <input type="number" id="sc-low" data-path="scoring.low_max" data-kind="int" min="0" max="99">
+              <span class="help">Scores at or below this are low.</span>
+            </div>
+            <div class="field">
+              <label for="sc-med">Medium maximum</label>
+              <input type="number" id="sc-med" data-path="scoring.medium_max" data-kind="int" min="1" max="100">
+              <span class="help">Must be greater than the low maximum.</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <div>
+              <h2>Deduplication and retention</h2>
+              <p class="hint">Suppression is keyed on a stable fingerprint; retention is measured from ingestion.</p>
+            </div>
+          </div>
+          <div class="stack">
+            <div class="field">
+              <label for="dd-suppress">Duplicate suppression (seconds)</label>
+              <input type="number" id="dd-suppress" data-path="dedup.suppression_seconds" data-kind="int" min="1" max="86400">
+            </div>
+            <div class="field">
+              <label for="re-days">Packet retention (days)</label>
+              <input type="number" id="re-days" data-path="retention.packet_days" data-kind="int" min="1" max="3650">
+            </div>
+            <div class="field">
+              <label for="re-prune">Prune interval (seconds)</label>
+              <input type="number" id="re-prune" data-path="retention.prune_interval_seconds" data-kind="int" min="1" max="86400">
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>Safe response</h2>
+          <p class="hint">Simulated blocks are the default. Real firewall rules need every gate below.</p>
+        </div>
+      </div>
+
+      <div class="grid cols-2">
+        <div class="stack">
+          <label class="check">
+            <input type="checkbox" data-path="safe_response.enabled" data-kind="bool">
+            <span><strong>Enable response actions</strong><br><span class="small faint">Adds simulated block/unblock to the incident drawer. No firewall is touched.</span></span>
+          </label>
+          <label class="check">
+            <input type="checkbox" data-path="safe_response.allow_firewall_changes" data-kind="bool">
+            <span><strong>Allow real firewall changes</strong><br><span class="small faint">Additionally requires root, a lab-range target, and a typed confirmation token per action.</span></span>
+          </label>
+          <div class="field">
+            <label for="sr-cidrs">Allowed target ranges (CIDR)</label>
+            <textarea id="sr-cidrs" rows="4" data-path="safe_response.allowed_cidrs" data-kind="cidrs"></textarea>
+            <span class="help">One per line or comma separated. 0.0.0.0/0 is rejected.</span>
+          </div>
+        </div>
+
+        <div class="banner warn">
+          <span><strong>Response is a teaching aid, not a control plane.</strong> The simulated list lives in memory, and the firewall path shells out to <span class="mono">iptables -I INPUT -s &lt;ip&gt; -j DROP</span> only when enabled. Nothing here is safe to point at production traffic. Keep targets inside a lab range and remove rules manually if you enable the real path.</span>
+        </div>
+      </div>
+    </section>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Deployment (read-only)</h2>
+          <p class="hint">These values come from the environment and config/thresholds.toml.</p>
+        </div>
+      </div>
+      <dl class="kv" id="deploymentInfo">
+        <dt>Database</dt><dd class="mono">&mdash;</dd>
+        <dt>Default mode</dt><dd class="mono">&mdash;</dd>
+        <dt>Flush interval</dt><dd class="mono">&mdash;</dd>
+        <dt>Queue capacity</dt><dd class="mono">&mdash;</dd>
+        <dt>Demo duration</dt><dd class="mono">&mdash;</dd>
+      </dl>
+    </div>
+
+    <div class="row between">
+      <div class="row">
+        <button class="btn btn-primary" id="saveSettings" type="submit">Save settings</button>
+        <button class="btn" id="reloadSettings" type="button">Reload from server</button>
+      </div>
+      <span class="notice" id="settingsNotice"></span>
+    </div>
+  </form>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/settings.js') }}"></script>
+{% endblock %}

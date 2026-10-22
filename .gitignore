@@ -12,8 +12,10 @@ venv/
 data/*.db
 data/*.db-wal
 data/*.db-shm
+data/pcap/*
 data/pcaps/*.pcap
 data/pcaps/*.cap
+data/pcap/*
 data/pcaps/*.pcapng
 !tests/fixtures/*.pcap
 !tests/fixtures/*.cap

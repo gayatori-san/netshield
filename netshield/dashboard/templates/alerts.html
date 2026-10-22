@@ -1,0 +1,110 @@
+{% extends "base.html" %}
+
+{% block title %}Alerts · NetShield{% endblock %}
+{% block page_title %}Alerts{% endblock %}
+{% block page_sub %}Every incident the detectors produced, with the evidence behind its score.{% endblock %}
+
+{% block content %}
+<div class="stack">
+
+  <section class="card">
+    <form id="alertFilters" class="toolbar" novalidate>
+      <div class="field narrow">
+        <label for="fSeverity">Severity</label>
+        <select id="fSeverity">
+          <option value="">All</option>
+          <option value="high">High</option>
+          <option value="medium">Medium</option>
+          <option value="low">Low</option>
+        </select>
+      </div>
+      <div class="field narrow">
+        <label for="fStatus">Status</label>
+        <select id="fStatus">
+          <option value="">All</option>
+          <option value="new">New</option>
+          <option value="acknowledged">Acknowledged</option>
+          <option value="resolved">Resolved</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fRule">Rule</label>
+        <select id="fRule"><option value="">All rules</option></select>
+      </div>
+      <div class="field">
+        <label for="fSearch">Search</label>
+        <input type="search" id="fSearch" placeholder="IP, title, rule, note" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="fFrom">From</label>
+        <input type="datetime-local" id="fFrom">
+      </div>
+      <div class="field">
+        <label for="fTo">To</label>
+        <input type="datetime-local" id="fTo">
+      </div>
+      <div class="field narrow">
+        <label for="fPerPage">Rows</label>
+        <select id="fPerPage">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn btn-sm" id="resetFilters" type="button">Reset</button>
+        <button class="btn btn-sm" id="exportBtn" type="button">Export CSV</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Incident queue</h2>
+        <p class="hint">Click a row to inspect evidence, add a note, or change status.</p>
+      </div>
+      <div class="card-actions">
+        <span class="tag" id="resultMeta">&mdash;</span>
+      </div>
+    </div>
+
+    <div id="alertsWrap" class="table-wrap">
+      <div class="empty"><strong>No incidents yet</strong>Run a capture or load the demo scenario.</div>
+    </div>
+
+    <div class="pagination">
+      <span id="pageInfo">&mdash;</span>
+      <div class="row">
+        <button class="btn btn-sm" id="prevPage" type="button">Previous</button>
+        <button class="btn btn-sm" id="nextPage" type="button">Next</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<div class="overlay" id="alertOverlay"></div>
+<aside class="drawer" id="alertDrawer" role="dialog" aria-modal="true" aria-labelledby="drawerHeading" tabindex="-1">
+  <div class="drawer-head">
+    <div>
+      <div class="row">
+        <span class="sev low" id="drawerSev">&mdash;</span>
+        <span class="status" id="drawerStatus"></span>
+        <span class="tag blocked hidden" id="drawerBlocked">blocked</span>
+      </div>
+      <h2 class="incident-title" id="drawerHeading">Incident</h2>
+      <div class="small faint mono" id="drawerId"></div>
+    </div>
+    <button class="btn btn-sm btn-ghost" id="closeDrawer" type="button" aria-label="Close incident details">Close</button>
+  </div>
+  <div class="drawer-body" id="drawerBody">
+    <div class="empty">Select an incident.</div>
+  </div>
+  <div class="drawer-foot" id="drawerFoot"></div>
+</aside>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/alerts.js') }}"></script>
+{% endblock %}

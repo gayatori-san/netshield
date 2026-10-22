@@ -16,6 +16,18 @@ def settings(tmp_path):
     return base.with_overrides(db_path=tmp_path / "api.db")
 
 
+@pytest.fixture(autouse=True)
+def isolate_uploads(tmp_path, fixtures_dir, monkeypatch):
+    from netshield.api import routes
+
+    upload_dir = tmp_path / "uploads"
+    upload_dir.mkdir()
+    monkeypatch.setattr(routes, "UPLOAD_DIR", upload_dir)
+    monkeypatch.setattr(
+        routes, "CAPTURE_ROOTS", ((upload_dir, "captures"), (fixtures_dir, "fixtures"))
+    )
+
+
 @pytest.fixture
 def app(settings):
     application = create_app(settings, demo_pace=False)

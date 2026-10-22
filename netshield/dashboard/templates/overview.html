@@ -1,3 +1,158 @@
-<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>NetShield</title></head>
-<body><p>Dashboard is being built.</p></body></html>
+{% extends "base.html" %}
+
+{% block title %}Overview · NetShield{% endblock %}
+{% block page_title %}Overview{% endblock %}
+{% block page_sub %}Live posture of the detection pipeline, recent findings, and capture control.{% endblock %}
+
+{% block content %}
+<div class="stack">
+
+  <section class="grid cols-4" aria-label="Key figures">
+    <div class="card stat">
+      <div class="label">Open incidents</div>
+      <div class="value" id="statOpen">&mdash;</div>
+      <div class="meta" id="statOpenMeta">awaiting data</div>
+    </div>
+    <div class="card stat high">
+      <div class="label">High severity open</div>
+      <div class="value" id="statHigh">&mdash;</div>
+      <div class="meta" id="statHighMeta">unresolved high-score findings</div>
+    </div>
+    <div class="card stat accent">
+      <div class="label">Packets observed</div>
+      <div class="value small" id="statPackets">&mdash;</div>
+      <div class="meta" id="statRate">no traffic yet</div>
+    </div>
+    <div class="card stat">
+      <div class="label">Blocked targets</div>
+      <div class="value small" id="statBlocked">&mdash;</div>
+      <div class="meta">safe-response simulation list</div>
+    </div>
+  </section>
+
+  <section class="grid split">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Traffic timeline</h2>
+          <p class="hint">Packets per second over the most recent buckets. Gap means no traffic.</p>
+        </div>
+        <div class="card-actions">
+          <span class="tag" id="seriesCount">&mdash;</span>
+        </div>
+      </div>
+      <div class="chart-wrap">
+        <canvas id="trafficChart" role="img" aria-label="Packets per second over time"></canvas>
+        <div class="chart-empty" id="trafficEmpty">No traffic recorded yet. Start a capture to populate this chart.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Protocol mix</h2>
+          <p class="hint">Every stored packet, by decoded transport protocol.</p>
+        </div>
+      </div>
+      <div class="chart-wrap short">
+        <canvas id="protoChart" role="img" aria-label="Packet protocol distribution"></canvas>
+        <div class="chart-empty" id="protoEmpty">Nothing to summarise.</div>
+      </div>
+      <div class="legend" id="protoLegend"></div>
+    </div>
+  </section>
+
+  <section class="grid split">
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Recent detections</h2>
+          <p class="hint">Newest first. Open an alert to read the evidence and change its status.</p>
+        </div>
+        <div class="card-actions">
+          <a class="btn btn-sm btn-ghost" href="{{ url_for('ui.alerts') }}">All alerts &rarr;</a>
+        </div>
+      </div>
+      <div id="recentWrap" class="table-wrap">
+        <div class="empty"><strong>No detections yet</strong>Run a capture to generate findings.</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h2>Capture source</h2>
+          <p class="hint">Replay a capture file, run the labelled demo, or sniff an interface.</p>
+        </div>
+      </div>
+
+      <form id="captureForm" class="stack" novalidate>
+        <div class="field">
+          <label for="captureMode">Source</label>
+          <select id="captureMode">
+            <option value="pcap">PCAP replay — offline, deterministic</option>
+            <option value="demo">Demo scenario — labelled synthetic traffic</option>
+            <option value="live">Live interface — requires privileges</option>
+          </select>
+        </div>
+
+        <div class="field" id="pcapField">
+          <label for="pcapPath">Capture file</label>
+          <select id="pcapPath"></select>
+          <span class="help" id="pcapHelp">Files from data/pcap and tests/fixtures only.</span>
+        </div>
+
+        <div class="field hidden" id="liveField">
+          <label for="iface">Network interface</label>
+          <select id="iface"></select>
+          <span class="help" id="ifaceHelp">Live capture needs CAP_NET_RAW or root.</span>
+          <label class="check mt-8">
+            <input type="checkbox" id="authorize">
+            <span>I am authorised to observe traffic on this interface.</span>
+          </label>
+        </div>
+
+        <div class="row">
+          <button class="btn btn-primary" id="startBtn" type="submit">Start capture</button>
+          <button class="btn" id="stopBtnLocal" type="button">Stop</button>
+          <span class="notice" id="captureNotice"></span>
+        </div>
+      </form>
+
+      <div class="divider"></div>
+
+      <form id="uploadForm" class="stack" novalidate>
+        <div class="field">
+          <label for="uploadFile">Upload a capture</label>
+          <input type="file" id="uploadFile" name="file" accept=".pcap,.pcapng,.cap">
+          <span class="help">Stored under data/pcap. Maximum 25 MiB; signature checked server-side.</span>
+        </div>
+        <div class="row">
+          <button class="btn" id="uploadBtn" type="submit">Upload</button>
+          <span class="notice" id="uploadNotice"></span>
+        </div>
+      </form>
+
+      <div class="banner warn mt-16">
+        <span><strong>Demo data is labelled.</strong> The demonstration scenario is synthetic traffic written to exercise every rule. It is never presented as live evidence, and the pipeline still records exactly what it processed.</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="card hidden" id="blockedCard">
+    <div class="card-head">
+      <div>
+        <h2>Safe-response block list</h2>
+        <p class="hint">Simulated blocks hide a target in this dashboard. No firewall rule is changed.</p>
+      </div>
+    </div>
+    <div class="row" id="blockedList"></div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
+<script src="{{ url_for('static', filename='js/overview.js') }}"></script>
+{% endblock %}

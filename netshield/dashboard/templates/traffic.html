@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+
+{% block title %}Traffic · NetShield{% endblock %}
+{% block page_title %}Traffic{% endblock %}
+{% block page_sub %}Packet metadata the pipeline stored. Payloads and hostnames are never recorded.{% endblock %}
+
+{% block content %}
+<div class="stack">
+
+  <section class="card">
+    <form id="trafficFilters" class="toolbar" novalidate>
+      <div class="field narrow">
+        <label for="tProto">Protocol</label>
+        <select id="tProto">
+          <option value="">All</option>
+          <option value="TCP">TCP</option>
+          <option value="UDP">UDP</option>
+          <option value="ICMP">ICMP</option>
+          <option value="OTHER">Other</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="tSrc">Source IP</label>
+        <input type="text" id="tSrc" placeholder="10.0.0.40" maxlength="64" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="tDst">Destination IP</label>
+        <input type="text" id="tDst" placeholder="10.0.0.10" maxlength="64" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="tSearch">Search</label>
+        <input type="search" id="tSearch" placeholder="IP, protocol, flags" maxlength="200">
+      </div>
+      <div class="field narrow">
+        <label for="tPerPage">Rows</label>
+        <select id="tPerPage">
+          <option value="25">25</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+      <div class="row">
+        <button class="btn btn-sm" id="tReset" type="button">Reset</button>
+        <button class="btn btn-sm" id="tRefresh" type="button">Refresh</button>
+      </div>
+    </form>
+  </section>
+
+  <section class="card">
+    <div class="card-head">
+      <div>
+        <h2>Packet log</h2>
+        <p class="hint">Newest first. Live view refreshes every five seconds while this tab is visible.</p>
+      </div>
+      <div class="card-actions">
+        <span class="tag" id="trafficMeta">&mdash;</span>
+      </div>
+    </div>
+
+    <div id="trafficWrap" class="table-wrap">
+      <div class="empty"><strong>No packets stored</strong>Start a capture to populate the log.</div>
+    </div>
+
+    <div class="pagination">
+      <span id="trafficPageInfo">&mdash;</span>
+      <div class="row">
+        <button class="btn btn-sm" id="tPrev" type="button">Previous</button>
+        <button class="btn btn-sm" id="tNext" type="button">Next</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/traffic.js') }}"></script>
+{% endblock %}
