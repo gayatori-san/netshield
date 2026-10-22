@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+
+# NetShield runtime data
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/pcaps/*.pcap
+data/pcaps/*.cap
+data/pcaps/*.pcapng
+!tests/fixtures/*.pcap
+!tests/fixtures/*.cap
+
+# Environment / secrets
+.env
+*.env
+!.env.example
+
+# Tooling
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+*.log
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
