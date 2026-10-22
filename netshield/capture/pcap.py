@@ -29,6 +29,17 @@ class CaptureError(RuntimeError):
     pass
 
 
+# pcap/pcapng file signatures. Checking these before constructing a Scapy
+# reader keeps a malformed file from opening a handle it never gets to close.
+_CAPTURE_SIGNATURES = (
+    b"\xd4\xc3\xb2\xa1",  # pcap, little-endian, microseconds
+    b"\xa1\xb2\xc3\xd4",  # pcap, big-endian, microseconds
+    b"\x4d\x3c\xb2\xa1",  # pcap, little-endian, nanoseconds
+    b"\xa1\xb2\x3c\x4d",  # pcap, big-endian, nanoseconds
+    b"\x0a\x0d\x0d\x0a",  # pcapng
+)
+
+
 class PcapSource:
     def __init__(self, path: str | Path, label: str | None = None):
         self.path = Path(path)
@@ -59,9 +70,18 @@ class PcapSource:
         if self._size == 0:
             self._status.state = "completed"
             self._status.finished_at = time.time()
+            return
+
+        try:
+            with self.path.open("rb") as handle:
+                signature = handle.read(4)
+        except OSError as exc:
+            raise CaptureError(f"cannot read PCAP file: {exc}") from exc
+        if signature not in _CAPTURE_SIGNATURES:
+            self._fail("not a readable capture file: unrecognised file signature")
 
     def packets(self) -> Iterator[PacketRecord]:
-        if self._size == 0:
+        if self._size == 0 or self._status.state == "error":
             return
 
         try:
