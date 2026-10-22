@@ -2,8 +2,19 @@
 
 **Project:** NetShield — Network Attack Detection System
 **Context:** Open Elective (Cyber Security & Laws) mini-project
-**Status:** Phase 2 deliverable — architecture contract, review before implementation
+**Status:** As-built reference (Phases 1-10 complete). This document started as the
+Phase 2 architecture contract and has been reconciled with the implementation.
 **Date:** 2026-10-22
+
+> **Implementation status:** all ten phases are implemented and the test suite reports
+> **190 passed**. Two deviations from the original plan are intentional and documented
+> here and in the README: the configuration format is TOML rather than YAML, and live
+> capture plus safe-response work landed in Phases 6-7 rather than Phase 9, so the
+> dashboard could be built against the final API. The dashboard is server-rendered
+> Jinja plus vanilla JS, not a static HTML tree, and the separate Incidents page was
+> merged into Alerts because they showed the same records. See
+> `docs/RULES.md`, `docs/RUNBOOK.md`, `docs/DEMO_SCRIPT.md`, and
+> `docs/THREAT_MODEL.md` for the operational detail.
 
 ---
 
@@ -104,10 +115,11 @@
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ ⑦ FLASK API                  netshield/api/                                    │
 │                                                                                 │
-│   app.py       app factory, error handlers, JSON envelope, static serving      │
+│   app.py       app factory, error handlers, JSON envelope, security headers   │
 │   routes.py    /api/overview /api/traffic /api/alerts /api/incidents          │
 │                /api/alerts/<id>/ack|resolve /api/settings /api/capture/*      │
-│                /api/response /api/export/incidents.csv                         │
+│                /api/response /api/export/incidents.csv /api/rules             │
+│                /api/interfaces /api/capture/files /api/capture/upload         │
 │   validation.py — query-param parsing, bounds, 400 responses                   │
 │                                                                                 │
 └──────────────────────────────┬──────────────────────────────────────────────────┘
@@ -115,11 +127,12 @@
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │ ⑧ LIVE WEB DASHBOARD         dashboard/                                       │
 │                                                                                 │
-│   index.html  Overview │ Live Traffic │ Alerts │ Incidents │ Settings          │
-│   css/        blue+white shell, dark navy monitoring surface                  │
-│   js/         api.js (fetch wrapper), views/*.js, charts.js (Chart.js)         │
+│   templates/  base.html + overview/alerts/traffic/settings Jinja shells       │
+│   static/     app.css, api.js, app.js, overview.js, alerts.js, traffic.js,    │
+│               settings.js, vendored Chart.js 4.4.7, shield.svg                │
+│   routes.py   `ui` blueprint: /, /alerts, /traffic, /settings                 │
 │                                                                                 │
-│   Live updates: 2-second polling (setInterval + fetch) — no Socket.IO          │
+│   Live updates: 2-second polling (fetch), paused while the tab is hidden       │
 └──────────────────────────────┬──────────────────────────────────────────────────┘
                                ▼
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -149,76 +162,70 @@
 
 ```
 netshield/
-├── netshield/                     # importable package (pip install -e .)
+├── netshield/                     # importable package
 │   ├── __init__.py                # version, package exports
 │   ├── models.py                  # PacketRecord, AlertCandidate, Alert, FeatureSnapshot
 │   ├── config/
 │   │   ├── __init__.py
-│   │   ├── settings.py            # loads thresholds.toml + env, dataclass Config
+│   │   └── settings.py            # Settings dataclasses, TOML loader, env overrides
 │   ├── capture/
 │   │   ├── __init__.py
-│   │   ├── pcap.py                # PCAP reading (PcapSource)
-│   │   ├── live.py                # LiveSource (scapy AsyncSniffer, privilege checks)
-│   │   └── sources.py             # PacketSource protocol, Normalizer → PacketRecord
+│   │   ├── pcap.py                # PcapSource, signature check, per-packet tolerance
+│   │   ├── live.py                # LiveSource (scapy AsyncSniffer), privilege probe
+│   │   ├── synthetic.py           # labelled 60-second demo scenario
+│   │   └── sources.py             # PacketSource protocol, status contract
 │   ├── features/
 │   │   ├── __init__.py
-│   │   ├── extract.py             # FlowKey, FlowState, FlowExtractor
+│   │   ├── extract.py             # FlowKey, FlowState, TCP state classification
 │   │   └── aggregation.py         # SlidingWindow, EWMA baseline, counters
 │   ├── detectors/
 │   │   ├── __init__.py
-│   │   ├── base.py                # Detector protocol + registry
-│   │   ├── port_scan.py
-│   │   ├── suspicious.py
-│   │   ├── spike.py
-│   │   └── dedup.py               # fingerprint + suppression window
+│   │   ├── base.py                # Detector protocol + candidate helper
+│   │   ├── port_scan.py           # PORT_SCAN_PORTS, PORT_SCAN_HOSTS
+│   │   ├── suspicious.py          # REPEATED_CONNECTIONS, SENSITIVE_PORT, CONN_RATE_ANOMALY
+│   │   ├── spike.py               # TRAFFIC_SPIKE, BASELINE_DEVIATION
+│   │   └── dedup.py               # fingerprint buckets + suppression window
 │   ├── scoring/
 │   │   ├── __init__.py
-│   │   ├── scorer.py              # transparent additive score
-│   │   └── severity.py            # severity bands + evidence gate
+│   │   ├── scorer.py              # additive score, recurrence bonus
+│   │   └── severity.py            # bands + evidence gate
 │   ├── storage/
 │   │   ├── __init__.py
-│   │   ├── db.py                  # connection, schema init, WAL
+│   │   ├── db.py                  # per-thread connections, WAL, schema init
 │   │   ├── schema.sql
-│   │   └── repositories.py        # incident/packet/bucket/response CRUD
-│   ├── pipeline.py                # queue + worker + detector fan-out + flush loop
+│   │   └── repositories.py        # incidents, packets, buckets, responses, CSV
+│   ├── pipeline.py                # queue + worker + detector fan-out + prune
 │   ├── api/
 │   │   ├── __init__.py
-│   │   ├── app.py                 # create_app()
-│   │   ├── routes.py              # blueprint with all /api routes
-│   │   ├── validation.py          # param parsing / bounds
-│   │   └── errors.py              # JSON error envelope + handlers
-│   └── responses.py               # safe response: simulated + lab-gated real
-├── dashboard/
-│   ├── index.html
-│   ├── css/styles.css
-│   └── js/{api.js, charts.js, overview.js, traffic.js, alerts.js, incidents.js, settings.js}
-├── tests/
-│   ├── conftest.py                # temp-db fixture, config fixture
-│   ├── unit/
-│   │   ├── test_capture_pcap.py
-│   │   ├── test_features.py
-│   │   ├── test_detector_port_scan.py
-│   │   ├── test_detector_suspicious.py
-│   │   ├── test_detector_spike.py
-│   │   ├── test_dedup.py
-│   │   ├── test_scoring.py
-│   │   ├── test_storage.py
-│   │   ├── test_api.py
-│   │   ├── test_dashboard_filters.py
-│   │   └── test_responses.py
-│   └── fixtures/                  # generated + committed .pcap files
-├── tools/
-│   ├── generate_fixtures.py       # deterministic synthetic traffic generator
-│   └── demo.py                    # scripted demonstration run
-├── config/
-│   ├── thresholds.toml            # all tunable detection thresholds
-├── data/                          # sqlite db + pcaps (gitignored)
+│   │   ├── app.py                 # create_app(), teardown, security headers
+│   │   ├── routes.py              # JSON API blueprint
+│   │   ├── validation.py          # param parsing, settings patch validation
+│   │   └── errors.py              # ApiError hierarchy + JSON handlers
+│   ├── dashboard/
+│   │   ├── __init__.py
+│   │   ├── routes.py              # UI blueprint
+│   │   ├── templates/             # base + four pages
+│   │   └── static/                # css, js, img, vendor (Chart.js)
+│   └── responses.py               # simulated + lab-gated iptables response
+├── config/thresholds.toml         # all tunable detection thresholds
+├── data/                          # SQLite db and uploaded pcaps (gitignored)
 ├── docs/
 │   ├── ARCHITECTURE.md            # this document
-│   ├── THREAT_MODEL.md            # Phase 10
-│   ├── DEMO_SCRIPT.md             # Phase 10
-│   └── VIVA_QUESTIONS.md          # Phase 10
-├── requirements.txt
+│   ├── RULES.md                   # rule specs and worked fixture numbers
+│   ├── RUNBOOK.md                 # install, operate, troubleshoot
+│   ├── DEMO_SCRIPT.md             # 10-minute classroom walkthrough
+│   ├── THREAT_MODEL.md            # assets, threats, controls, residual risk
+│   ├── VIVA_QUESTIONS.md          # viva preparation
+│   └── screenshots/               # verified dashboard captures
+├── tests/
+│   ├── conftest.py                # settings, fixtures_dir, packet_factory, replay
+│   ├── fixtures/                  # committed PCAPs (normal, scan, sweep, spike, bad)
+│   ├── unit/                      # pcap, features, detectors, dedup, scoring, storage, responses
+│   └── integration/               # pipeline, API contract, dashboard
+├── tools/generate_fixtures.py     # deterministic offline PCAP generator
+├── run.py                         # entry point
+├── requirements.txt               # scapy, Flask (pinned)
+├── requirements-dev.txt           # + pytest
 ├── .env.example
 ├── .gitignore
 ├── README.md
@@ -284,7 +291,7 @@ class Alert:
 ```python
 class Detector(Protocol):
     rule_id: str
-    def update(self, pkt: PacketRecord, snap: FeatureSnapshot) -> None: ...
+    def update(self, pkt: PacketRecord) -> None: ...
     def flush(self, now: float) -> list[AlertCandidate]: ...
 ```
 Deterministic: same packet sequence → same candidates. No I/O, no clock reads other than the `now` argument. This is what makes unit testing honest.
@@ -302,7 +309,7 @@ class PacketSource(Protocol):
 ```python
 class IncidentRepository:
     def insert_alert(self, alert: Alert) -> bool          # False if duplicate fingerprint
-    def list_incidents(self, **filters) -> tuple[list[dict], int]
+    def list(self, **filters) -> tuple[list[dict], int]
     def get_incident(self, incident_id: str) -> dict | None
     def acknowledge(self, incident_id: str, note: str | None) -> dict | None
     def resolve(self, incident_id: str, note: str | None) -> dict | None
@@ -318,22 +325,26 @@ class IncidentRepository:
 | Method | Path | Purpose | Notes |
 |---|---|---|---|
 | GET | `/api/health` | liveness | no auth, no data |
-| GET | `/api/overview` | monitoring status, counters, severity counts, top endpoints | single aggregated payload |
-| GET | `/api/traffic` | recent packet/flow list | `?page=&per_page=&src=&dst=&proto=&q=` |
-| GET | `/api/alerts` | alerts list | `?severity=&rule=&status=&from=&to=&q=` |
-| GET | `/api/alerts/<id>` | alert detail + evidence + timeline | |
+| GET | `/api/rules` | rule IDs, titles, base weights | drives the Settings read-only view |
+| GET | `/api/interfaces` | interface names + `can_capture` probe | `AF_PACKET` capability check |
+| GET | `/api/overview` | status, features, counters, recent alerts, series, protocols, blocked targets, thresholds | single aggregated payload |
+| GET | `/api/traffic` | packet metadata | `?page=&per_page=&src=&dst=&proto=&q=` |
+| GET | `/api/alerts` | incidents (alias of `/api/incidents`) | `?severity=&rule=&status=&from=&to=&q=&page=&per_page=` |
+| GET | `/api/alerts/<id>` | incident + events + blocked flag | |
 | POST | `/api/alerts/<id>/ack` | acknowledge | body: `{note?}` |
 | POST | `/api/alerts/<id>/resolve` | resolve | body: `{note?}` |
-| GET | `/api/incidents` | history search | `?q=&status=&severity=&page=` |
+| GET | `/api/incidents` | history search (same handler) | same filters |
 | GET | `/api/incidents/<id>` | detail | |
-| GET | `/api/export/incidents.csv` | CSV export | honours same filters |
-| GET | `/api/settings` | current thresholds + capture status | |
-| PUT | `/api/settings` | update thresholds | validated, persisted |
-| POST | `/api/capture/start` | start PCAP or live analysis | body: `{mode, path?, iface?}` |
+| GET | `/api/export/incidents.csv` | CSV export | honours same filters, formula guard |
+| GET | `/api/settings` | thresholds + capture + `applies_immediately` | |
+| PUT | `/api/settings` | update thresholds | validated; session-scoped |
+| GET | `/api/capture/files` | PCAPs in `data/pcap` and `tests/fixtures` | signature-checked |
+| POST | `/api/capture/upload` | upload a capture | multipart `file`, max 25 MiB |
+| POST | `/api/capture/start` | start PCAP, demo, or live | body: `{mode, path?, iface?, confirm_authorization?}` |
 | POST | `/api/capture/stop` | stop monitoring | idempotent |
-| GET | `/api/capture/status` | capture state + counters | |
-| POST | `/api/response` | safe response action | lab-gated, simulated by default |
-| GET | `/api/response` | response action log | |
+| GET | `/api/capture/status` | capture state + features snapshot | polled every 2 s |
+| POST | `/api/response` | simulated or lab-gated firewall action | `{action, target_ip, incident_id?, confirm_token?, reason?}` |
+| GET | `/api/response` | response action log + blocked targets | |
 
 All responses use one envelope:
 ```json
@@ -350,7 +361,7 @@ All responses use one envelope:
 - [x] Empty PCAP handled gracefully (0 packets, no crash, clear status)
 - [x] Non-IP / undecodable packets counted as `skipped`, not fatal
 - [x] Live capture with explicit interface, privilege precheck, hard stop
-- [x] Clear capture status: `idle | reading_pcap | live | error | stopped`
+- [x] Clear capture status: `idle | running | stopping | stopped | completed | error` (natural end = `completed`, manual stop = `stopped`)
 - [x] Permission-denied surfaced with actionable remedy (`setcap` / `sudo` instructions)
 - [x] Source label on every packet (`pcap:` / `live:` / `synthetic:`)
 
@@ -371,7 +382,7 @@ All responses use one envelope:
 - [x] **R2 Port scan (hosts):** ≥ `distinct_host_threshold` distinct dst hosts from one src within window → alert
 - [x] **R3 Repeated connection attempts:** ≥ `repeat_attempt_threshold` conn attempts to same (src,dst_port) within window
 - [x] **R4 Sensitive port access:** connection to a configured sensitive port (22, 23, 3389, 3306, 5432, 445, …) → alert
-- [x] **R5 Unusual connection rate:** source's connection rate exceeds `conn_rate_threshold` (per window) **and** is ≥ `conn_rate_multiplier`× the source's own baseline
+- [x] **R5 Unusual connection rate:** source's connection rate exceeds `conn_rate_threshold` (per window); sufficient only when it is also ≥ `conn_rate_multiplier`× the source's own baseline with enough samples
 - [x] **R6 Absolute traffic spike:** packet rate in second bucket ≥ `spike_absolute_pps` → alert
 - [x] **R7 Baseline deviation spike:** packet rate ≥ `spike_baseline_ratio`× EWMA baseline **and** ≥ `spike_min_pps` → alert
 - [x] ~~R8 Half-open pattern~~ — merged into R3 during Phase 5 (see §6 note)
@@ -407,14 +418,14 @@ All responses use one envelope:
 - [x] Endpoints listed in §4.5
 
 ### Dashboard
-- [x] Blue/white application shell, dark navy monitoring surface
-- [x] Overview: status, packets processed, traffic rate, severity counts, recent incidents, traffic-over-time, protocol pie, top src/dst
-- [x] Live traffic: recent flows, filter + pagination, no payload exposed
-- [x] Alerts: severity badges, rule, evidence, timeline, ack/resolve, filters
-- [x] Incidents: search, detail, status, notes, CSV export
-- [x] Settings: thresholds, interface selection, PCAP mode, retention, safe-response config
-- [x] 2-second polling for live panels
-- [x] Explicit "DEMONSTRATION DATA" badge on synthetic-sourced data
+- [x] Dark operations-console shell with responsive navigation (1440/1024/390 verified)
+- [x] Overview: status pill, origin badge, packets/rate/open/high cards, traffic-over-time line chart, protocol doughnut, recent incidents, blocked targets, capture panel (PCAP/demo/live) and PCAP upload
+- [x] Traffic: packet metadata, source/destination/protocol/search filters, pagination, origin and blocked tags
+- [x] Alerts: severity/status/rule/search/date filters, pagination, evidence drawer with reasons, facts, evidence, timeline, notes, ack/resolve
+- [x] Incidents merged into Alerts (same records) with CSV export honoring active filters
+- [x] Settings: server-validated threshold form, per-field errors, read-only deployment card, safe-response fields
+- [x] 2-second status polling and 2.5-second overview polling; paused while hidden
+- [x] Explicit "demonstration data" badge and per-row demo tags
 - [x] Empty states that state *why* there is no data (never fake numbers)
 
 ### Safety
@@ -497,7 +508,6 @@ suppression_seconds = 300        # same fingerprint within window -> suppressed
 - `distinct_port_threshold: 15` — typical admin services + a few apps sit below 15 distinct ports per host per minute; service-discovery tools and scanners exceed it. Deliberately conservative to favour low false positives over recall.
 - `spike_absolute_pps: 500` — one full-speed TCP handshake storm on a laptop exceeds this; ordinary browsing does not.
 - `spike_min_pps: 100` — a ratio alone is meaningless when the baseline is 2 pps (2×3 = 6 pps would be "a spike"). The floor prevents that class of false positive.
-- `half_open_threshold: 20` — SYN-without-SYN-ACK is an *inference* (asymmetric capture, dropped packets, firewall drops all look identical), so the bar is set high and the alert is labelled accordingly.
 
 ---
 
@@ -541,69 +551,72 @@ evidence gate:  if evidence_sufficient is False → severity = min(severity, med
 
 ---
 
-## 8. SQLite Schema (draft — implemented in Phase 6)
+## 8. SQLite Schema (as built)
 
 ```sql
-CREATE TABLE IF NOT EXISTS incidents (
-  id                 TEXT PRIMARY KEY,
-  fingerprint        TEXT NOT NULL UNIQUE,
-  rule_id            TEXT NOT NULL,
-  title              TEXT NOT NULL,
-  severity           TEXT NOT NULL CHECK (severity IN ('low','medium','high')),
-  score              INTEGER NOT NULL,
-  reasons_json       TEXT NOT NULL,
-  evidence_json      TEXT NOT NULL,
-  facts_json         TEXT NOT NULL,
+CREATE TABLE incidents (
+  id TEXT PRIMARY KEY,
+  fingerprint TEXT NOT NULL UNIQUE,
+  rule_id TEXT NOT NULL,
+  title TEXT NOT NULL,
+  severity TEXT NOT NULL CHECK (severity IN ('low','medium','high')),
+  score INTEGER NOT NULL,
+  reasons_json TEXT NOT NULL,
+  evidence_json TEXT NOT NULL,
+  facts_json TEXT NOT NULL,
   evidence_sufficient INTEGER NOT NULL,
-  src_ip             TEXT,
-  dst_ip             TEXT,
-  detected_at        REAL NOT NULL,
-  window_start       REAL NOT NULL,
-  window_end         REAL NOT NULL,
-  status             TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','acknowledged','resolved')),
-  analyst_notes      TEXT,
-  data_origin        TEXT NOT NULL DEFAULT 'real',   -- real | demonstration
-  created_at         REAL NOT NULL,
-  updated_at         REAL NOT NULL
+  src_ip TEXT, dst_ip TEXT,
+  detected_at REAL NOT NULL,
+  window_start REAL NOT NULL,
+  window_end REAL NOT NULL,
+  status TEXT NOT NULL DEFAULT 'new' CHECK (status IN ('new','acknowledged','resolved')),
+  analyst_notes TEXT,
+  data_origin TEXT NOT NULL DEFAULT 'real' CHECK (data_origin IN ('real','demonstration')),
+  created_at REAL NOT NULL,
+  updated_at REAL NOT NULL
 );
-CREATE INDEX IF NOT EXISTS idx_inc_detected ON incidents(detected_at DESC);
-CREATE INDEX IF NOT EXISTS idx_inc_severity ON incidents(severity);
-CREATE INDEX IF NOT EXISTS idx_inc_status   ON incidents(status);
-CREATE INDEX IF NOT EXISTS idx_inc_rule     ON incidents(rule_id);
+-- indexes: detected_at DESC, severity, status, rule_id
 
-CREATE TABLE IF NOT EXISTS packets (
-  id        INTEGER PRIMARY KEY AUTOINCREMENT,
-  ts        REAL NOT NULL,
-  src_ip    TEXT NOT NULL,
-  dst_ip    TEXT NOT NULL,
-  src_port  INTEGER,
-  dst_port  INTEGER,
-  protocol  TEXT NOT NULL,
-  flags     TEXT,
-  tcp_state TEXT,
-  size      INTEGER NOT NULL,
-  origin    TEXT NOT NULL
-);
-CREATE INDEX IF NOT EXISTS idx_pkt_ts ON packets(ts DESC);
-
-CREATE TABLE IF NOT EXISTS traffic_buckets (
-  bucket_ts  INTEGER PRIMARY KEY,   -- epoch seconds
-  packets    INTEGER NOT NULL,
-  bytes      INTEGER NOT NULL
-);
-
-CREATE TABLE IF NOT EXISTS response_actions (
-  id         TEXT PRIMARY KEY,
-  incident_id TEXT,
-  target_ip  TEXT NOT NULL,
-  action     TEXT NOT NULL,        -- simulated_block | firewall_insert
-  applied    INTEGER NOT NULL,
-  reason     TEXT,
+CREATE TABLE incident_events (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  incident_id TEXT NOT NULL REFERENCES incidents(id) ON DELETE CASCADE,
+  event_type TEXT NOT NULL,
+  detail TEXT,
   created_at REAL NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS settings (
-  key   TEXT PRIMARY KEY,
+CREATE TABLE packets (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  ts REAL NOT NULL,
+  src_ip TEXT NOT NULL, dst_ip TEXT NOT NULL,
+  src_port INTEGER, dst_port INTEGER,
+  protocol TEXT NOT NULL,
+  flags TEXT, tcp_state TEXT,
+  size INTEGER NOT NULL,
+  origin TEXT NOT NULL,
+  ingested_at REAL NOT NULL
+);
+-- indexes: ts DESC, src_ip, dst_ip, protocol, ingested_at
+
+CREATE TABLE traffic_buckets (
+  bucket_ts INTEGER PRIMARY KEY,
+  packets INTEGER NOT NULL,
+  bytes INTEGER NOT NULL
+);
+
+CREATE TABLE response_actions (
+  id TEXT PRIMARY KEY,
+  incident_id TEXT,
+  target_ip TEXT NOT NULL,
+  action TEXT NOT NULL,
+  applied INTEGER NOT NULL,
+  mode TEXT NOT NULL,
+  reason TEXT,
+  created_at REAL NOT NULL
+);
+
+CREATE TABLE settings (
+  key TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
 ```
@@ -621,9 +634,9 @@ CREATE TABLE IF NOT EXISTS settings (
 | **5** | `detectors/*` + `scoring/*` (scoring scaffold) | Each rule has its own test file asserting **below threshold → no alert**, **at/above → alert**, **false-positive case → no alert** |
 | **6** | `storage/db.py`, `schema.sql`, `repositories.py`; full scorer wired | Persistence tests pass; duplicate insert returns False; severity bands and evidence gate asserted; CSV export opens in a spreadsheet |
 | **7** | `api/app.py`, `routes.py`, `validation.py`, `errors.py` | Every endpoint returns the envelope; invalid params → 400 with field detail; missing incident → 404; API test suite passes |
-| **8** | `dashboard/*` wired to real API | Every panel renders from an API response; **no hardcoded sample data in the monitoring surface**; empty states explain why empty |
-| **9** | `capture/live.py`, `responses.py`, capture control endpoints, Settings UI | Live capture starts/stops on an explicit iface; permission denial produces the actionable error; simulated response blocks *displayed* traffic; real firewall path refuses non-lab targets |
-| **10** | Integration, full `pytest` run, README, THREAT_MODEL, DEMO_SCRIPT, VIVA_QUESTIONS, screenshots | `pytest` green with a real report; documented known limitations; screenshots of the running dashboard |
+| **8** | `dashboard/*` wired to real API | Every panel renders from an API response; **no hardcoded sample data in the monitoring surface**; empty states explain why empty. Completed with Jinja shells + vanilla JS and browser verification. |
+| **9** | `capture/live.py`, `responses.py`, capture control endpoints, Settings UI | Live capture starts/stops on an explicit iface; permission denial produces the actionable error; simulated response blocks *displayed* traffic; real firewall path refuses non-lab targets. **Delivered early in Phases 6-7** because the API and dashboard needed the final behavior. |
+| **10** | Integration, full `pytest` run, README, THREAT_MODEL, DEMO_SCRIPT, VIVA_QUESTIONS, screenshots | `pytest` green with a real report; documented known limitations; screenshots of the running dashboard. 190 passing; docs and screenshots committed. |
 
 **Working rules for every phase**
 1. Write the module → write its test → run the test → **paste the actual output**.
@@ -637,12 +650,12 @@ CREATE TABLE IF NOT EXISTS settings (
 
 | Control | Implementation | Where enforced |
 |---|---|---|
-| No unauthorized capture | Live capture only starts with an explicitly selected interface; the UI states the operator asserts authorization | `api/routes.py` `/api/capture/start` + dashboard confirmation dialog |
+| No unauthorized capture | Live capture only starts with an explicitly selected interface and `confirm_authorization: true`; the UI states the operator asserts authorization | `/api/capture/start` + Overview authorization checkbox |
 | Least-privilege capture | Recommend `setcap cap_net_raw+eip` on the venv interpreter instead of running the whole app as root | `capture/live.py` privilege probe + README |
 | No attack traffic | No packet *generation* of malicious traffic; the fixture generator produces benign traffic shapes only (a scan pattern and a rate spike are *simulated as observations*, never sent to a third party) | `tools/generate_fixtures.py` — documented as offline file generation |
 | No external scanning | Nothing in the codebase sends traffic to a remote host | Whole codebase; documented in threat model |
 | Response opt-in | `safe_response.enabled: false` by default; simulated mode affects only display | `netshield/responses.py` |
-| Real firewall gate | Requires root + explicit flag + lab CIDR allow-list + confirm token; refuses any other target | `responses.py::FirewallResponder` |
+| Real firewall gate | Requires root + explicit flag + lab CIDR allow-list + exact confirm token; refuses any other target | `responses.py::ResponseService._firewall` |
 | Stop always available | `/api/capture/stop` is idempotent and reachable at all times | `api/routes.py` |
 | Honest labelling | `data_origin` column (`real` / `demonstration`); dashboard badge | storage + dashboard |
 
@@ -660,16 +673,25 @@ CREATE TABLE IF NOT EXISTS settings (
 6. Single-process, in-memory feature windows — no horizontal scale, and windows reset on restart.
 7. No payload inspection → no signature-based detection, no TLS/hostname visibility.
 8. Clock skew or deliberate timestamp manipulation in a PCAP could distort the sliding windows.
+9. No authentication: the server is loopback-only by default and is not safe to expose.
+10. Windows live capture is unsupported; PCAP replay and the demo are cross-platform.
+11. A capture that reuses a database accumulates incidents across runs by design; use a scratch database for exact demo counts.
+12. The dashboard was verified in headless Chromium at three widths; Safari/Firefox are not part of the automated check.
 
 ---
 
-## 12. Open Questions for Review
+## 12. Resolved Decisions
 
-1. **Scope of the "sensitive ports" list** — proposed defaults in §6. Keep, or add college-relevant services (e.g. `8080`, `3000`, `5432`)?
-2. **Sensitive-port severity** — a single connection to port 22 is currently *insufficient evidence* and is capped at medium. Acceptable, or should it be logged as `low` without an incident row?
-3. **Retention default** — propose 7 days for packets, incidents retained indefinitely. Acceptable for the syllabus?
-4. **Demo dataset** — propose a synthetic scenario set: `normal_day.pcap`, `port_scan_lab.pcap`, `traffic_spike_lab.pcap`, `malformed.pcap`, `empty.pcap`. Good coverage for a 5-minute demo?
+1. **Sensitive ports** — defaults kept; the list is editable in `config/thresholds.toml`.
+2. **Sensitive-port severity** — one attempt is recorded but marked insufficient and capped at medium; two or more become sufficient. Keeping the low-severity record is useful for the analyst timeline.
+3. **Retention** — packets 7 days, pruned every 300 seconds during capture; incidents retained for coursework.
+4. **Demo dataset** — expanded beyond the original four fixtures: `normal_day`, `port_scan_lab`, `suspicious_lab`, `host_sweep_lab`, `traffic_spike_lab`, `empty`, `empty_valid`, `malformed`. The built-in demo covers scan, sweep, repeated SSH, and a UDP spike.
+5. **Incidents page** — merged into Alerts; the API keeps both `/api/alerts` and `/api/incidents` aliases.
+6. **Configuration format** — TOML, not YAML, for the stdlib parser.
+7. **Persistence of Settings changes** — session-scoped; the TOML file is the durable source of truth.
 
 ---
 
-**Next phase (3) — on approval:** create the virtualenv, pin `requirements.txt` to the versions verified in Phase 1, write `.env.example`, and author `config/thresholds.toml` exactly as specified in §6.
+**Documentation map:** `README.md` for setup and limitations, `RULES.md` for detection
+math, `RUNBOOK.md` for operations, `DEMO_SCRIPT.md` for the classroom walkthrough,
+`THREAT_MODEL.md` for security analysis, and `VIVA_QUESTIONS.md` for preparation.
