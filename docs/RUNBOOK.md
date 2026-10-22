@@ -123,7 +123,7 @@ Default configuration disables everything:
 [safe_response]
 enabled = false
 allow_firewall_changes = false
-lab_cidrs = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+allowed_cidrs = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
 ```
 
 To demonstrate simulation, set `enabled = true` and restart. Simulated blocks are
@@ -131,7 +131,7 @@ in-memory only (max 500) and disappear on restart; they change the dashboard, no
 host.
 
 Real firewall changes additionally require `allow_firewall_changes = true`, root, a
-target inside `lab_cidrs`, and the confirmation token shown in the UI:
+target inside `allowed_cidrs`, and the confirmation token shown in the UI:
 
 ```text
 BLOCK 10.0.0.66

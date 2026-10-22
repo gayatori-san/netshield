@@ -68,11 +68,13 @@ including the operator's own gateway or a public service.
 **Controls (all must pass, in `responses.py`):**
 
 1. `safe_response.enabled = true` (default false).
-2. Target parses as an IP and is inside `lab_cidrs` (RFC 1918/loopback by default).
+2. Target parses as an IP and is inside `safe_response.allowed_cidrs` (RFC 1918/loopback by default).
 3. For real changes: `allow_firewall_changes = true`.
 4. For real changes: effective UID 0.
 5. For real changes: `iptables` exists.
 6. For real changes: `confirm_token` equals exactly `BLOCK <ip>` or `UNBLOCK <ip>`.
+
+Simulated actions pass gates 1-2 only; real actions must pass all six.
 
 Every attempt is recorded in `response_actions` with mode and applied flag. Simulated
 blocks are capped at 500 and affect display only.

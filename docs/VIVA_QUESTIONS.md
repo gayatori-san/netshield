@@ -152,8 +152,9 @@ Jinja autoescaping, `textContent`/`escapeHtml` for API data, and a CSP with
 CDN trust (`api/app.py`, `dashboard/templates/`).
 
 **29. What stops the response feature from blocking a random IP?**
-Six gates: feature enabled, valid IP, target inside configured lab CIDRs, real changes
-allowed, root, `iptables` present, and an exact confirmation token. Simulation never
+Seven checks for a real action: feature enabled, valid IP, target inside configured lab
+CIDRs, real changes allowed, root, `iptables` present, and an exact confirmation token.
+Simulation only needs the first two. Simulation never
 touches the host (`responses.py`).
 
 **30. Why is IP blocking described as weak?**
