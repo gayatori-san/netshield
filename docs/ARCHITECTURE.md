@@ -154,7 +154,7 @@ netshield/
 │   ├── models.py                  # PacketRecord, AlertCandidate, Alert, FeatureSnapshot
 │   ├── config/
 │   │   ├── __init__.py
-│   │   ├── settings.py            # loads thresholds.yaml + env, dataclass Config
+│   │   ├── settings.py            # loads thresholds.toml + env, dataclass Config
 │   ├── capture/
 │   │   ├── __init__.py
 │   │   ├── pcap.py                # PCAP reading (PcapSource)
@@ -211,7 +211,7 @@ netshield/
 │   ├── generate_fixtures.py       # deterministic synthetic traffic generator
 │   └── demo.py                    # scripted demonstration run
 ├── config/
-│   ├── thresholds.yaml            # all tunable detection thresholds
+│   ├── thresholds.toml            # all tunable detection thresholds
 ├── data/                          # sqlite db + pcaps (gitignored)
 ├── docs/
 │   ├── ARCHITECTURE.md            # this document
@@ -375,7 +375,7 @@ All responses use one envelope:
 - [x] **R6 Absolute traffic spike:** packet rate in second bucket ≥ `spike_absolute_pps` → alert
 - [x] **R7 Baseline deviation spike:** packet rate ≥ `spike_baseline_ratio`× EWMA baseline **and** ≥ `spike_min_pps` → alert
 - [x] **R8 Half-open pattern:** ≥ `half_open_threshold` SYN-without-SYN-ACK from one source → alert (explicitly labelled *inferred*)
-- [x] All thresholds configurable via `config/thresholds.yaml`
+- [x] All thresholds configurable via `config/thresholds.toml`
 - [x] Isolated single connection never flagged
 - [x] Duplicate alert suppression via fingerprint + suppression window
 
@@ -443,7 +443,13 @@ All responses use one envelope:
 
 ## 6. Detection Rule Specifications (initial thresholds)
 
-All values live in `config/thresholds.yaml` and are editable at runtime via Settings.
+All values live in `config/thresholds.toml` and are editable at runtime via Settings.
+
+> **Implementation change from the draft plan (Phase 3):** the config file is
+> **TOML, not YAML**. Reason: `tomllib` is in the standard library on Python
+> 3.11+, while PyYAML is a C-extension dependency that can fail to install on a
+> student laptop. TOML still supports comments and nested sections, so
+> readability is preserved. The file is still human-editable and auditable.
 
 ```yaml
 detection:
@@ -593,7 +599,7 @@ CREATE TABLE IF NOT EXISTS settings (
 
 | Phase | Deliverable | Exit criteria (verifiable) |
 |---|---|---|
-| **3** | venv, `requirements.txt` (pinned), `.env.example`, `config/thresholds.yaml`, `pyproject.toml`, `.gitignore` | `pip install -r requirements.txt` succeeds on Python 3.14; `thresholds.yaml` loads into a `Config` dataclass; `.env.example` documents every env var |
+| **3** | venv, `requirements.txt` (pinned), `.env.example`, `config/thresholds.toml`, `pyproject.toml`, `.gitignore` | `pip install -r requirements.txt` succeeds on Python 3.14; `thresholds.toml` loads into a `Config` dataclass; `.env.example` documents every env var |
 | **4** | `capture/pcap.py`, `capture/sources.py`, `features/extract.py`, `features/aggregation.py` | Fixture generator produces 4 PCAPs (normal, port-scan, spike, malformed+empty); parser tests pass incl. malformed and empty inputs; feature tests assert exact counters |
 | **5** | `detectors/*` + `scoring/*` (scoring scaffold) | Each rule has its own test file asserting **below threshold → no alert**, **at/above → alert**, **false-positive case → no alert** |
 | **6** | `storage/db.py`, `schema.sql`, `repositories.py`; full scorer wired | Persistence tests pass; duplicate insert returns False; severity bands and evidence gate asserted; CSV export opens in a spreadsheet |
@@ -649,4 +655,4 @@ CREATE TABLE IF NOT EXISTS settings (
 
 ---
 
-**Next phase (3) — on approval:** create the virtualenv, pin `requirements.txt` to the versions verified in Phase 1, write `.env.example`, and author `config/thresholds.yaml` exactly as specified in §6.
+**Next phase (3) — on approval:** create the virtualenv, pin `requirements.txt` to the versions verified in Phase 1, write `.env.example`, and author `config/thresholds.toml` exactly as specified in §6.

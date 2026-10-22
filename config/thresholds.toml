@@ -1,0 +1,74 @@
+# NetShield detection configuration.
+#
+# Every threshold here is a *heuristic* knob, not a proof of attack.
+# Raising a threshold reduces false positives at the cost of recall.
+# Parsed with the Python standard library (tomllib) so no extra dependency
+# is needed on a student machine.
+
+[capture]
+# "pcap" | "live" | "demo"  -- the UI can override this per session.
+default_mode = "pcap"
+# How often the pipeline evaluates detectors and writes alerts.
+flush_interval_seconds = 1.0
+# Bounded queue = backpressure instead of unbounded memory growth.
+queue_maxsize = 10000
+
+[detection.port_scan]
+# Sliding window used for distinct port / distinct host counting.
+window_seconds = 60
+# R1: distinct destination ports from one source to one destination.
+distinct_port_threshold = 15
+# R2: distinct destination hosts from one source.
+distinct_host_threshold = 20
+# Guard: a 3-packet truncated capture must not count as a scan.
+min_packets_per_target = 10
+
+[detection.suspicious]
+window_seconds = 60
+# R3: attempts to the same (source, destination port).
+repeat_attempt_threshold = 15
+# A single busy application should not look like a scanner.
+repeat_min_source_ports = 2
+# R5: connections per window from one source, and the multiple of its own baseline.
+conn_rate_threshold = 60
+conn_rate_multiplier = 3.0
+# R8: SYN packets without a matching SYN-ACK. This is an INFERENCE, not proof.
+half_open_threshold = 20
+# Remote administration and database ports. Dev ports (3000/8080) are
+# deliberately excluded: they are too common to be useful evidence.
+sensitive_ports = [21, 22, 23, 445, 1433, 3306, 3389, 5432, 5900, 6379, 9200, 27017]
+
+[detection.spike]
+window_seconds = 10
+# R6: absolute packets-per-second ceiling.
+spike_absolute_pps = 500
+# R7: multiple of the rolling baseline.
+spike_baseline_ratio = 3.0
+# R7 floor: a ratio against a 2 pps baseline is meaningless without this.
+spike_min_pps = 100
+# EWMA smoothing factor for the rolling baseline.
+baseline_alpha = 0.3
+# A baseline computed from fewer completed seconds is not a baseline.
+baseline_min_samples = 3
+
+[detection.dedup]
+# Identical fingerprint within this window is suppressed.
+suppression_seconds = 300
+
+[scoring]
+# low < low_max <= medium < medium_max <= high
+low_max = 34
+medium_max = 67
+
+[retention]
+# Packets are pruned; incidents are retained indefinitely by default.
+packet_days = 7
+prune_interval_seconds = 300
+
+[safe_response]
+# Master switch. Disabled by default: NetShield is an alerting tool first.
+enabled = false
+# Real firewall changes stay off unless an instructor explicitly enables them.
+allow_firewall_changes = false
+# Only these networks may ever be targeted, even in a real-firewall experiment.
+allowed_cidrs = ["127.0.0.0/8", "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
