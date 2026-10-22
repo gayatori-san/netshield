@@ -308,17 +308,30 @@ class PacketSource(Protocol):
 ### 4.4 Storage (`storage/repositories.py`)
 ```python
 class IncidentRepository:
-    def insert_alert(self, alert: Alert) -> bool          # False if duplicate fingerprint
-    def list(self, **filters) -> tuple[list[dict], int]
-    def get_incident(self, incident_id: str) -> dict | None
-    def acknowledge(self, incident_id: str, note: str | None) -> dict | None
-    def resolve(self, incident_id: str, note: str | None) -> dict | None
-    def add_packet(self, pkt: PacketRecord) -> None
-    def traffic_series(self, bucket_seconds: int) -> list[dict]
+    def insert(self, alert: Alert) -> bool               # False if duplicate fingerprint
+    def get(self, incident_id: str) -> dict | None
+    def list(self, *, page, per_page, **filters) -> tuple[list[dict], int]
+    def update_status(self, incident_id, status, note=None) -> dict | None
+    def add_note(self, incident_id, note) -> dict | None
+    def events(self, incident_id: str) -> list[dict]
+    def stats(self) -> dict
+    def recent(self, limit: int = 10) -> list[dict]
+    def export_csv(self, limit: int = 10000, **filters) -> str
+
+class PacketRepository:
+    def add_many(self, records, origin, *, now=None) -> int
+    def list(self, *, page, per_page, **filters) -> tuple[list[dict], int]
+    def count(self) -> int
     def protocol_counts(self) -> dict[str, int]
-    def top_endpoints(self, n: int) -> dict[str, list[dict]]
-    def export_csv(self, **filters) -> str
-    def prune(self, retention_days: int) -> int
+    def prune(self, days: int, *, now=None) -> int
+
+class TrafficRepository:
+    def upsert(self, buckets) -> int
+    def series(self, limit: int = 120) -> list[dict]
+
+class ResponseRepository:
+    def add(self, *, target_ip, action, applied, mode, **meta) -> dict
+    def list(self, limit: int = 50) -> list[dict]
 ```
 
 ### 4.5 API routes
@@ -429,7 +442,7 @@ All responses use one envelope:
 - [x] Empty states that state *why* there is no data (never fake numbers)
 
 ### Safety
-- [x] Live capture requires explicit iface selection in Settings
+- [x] Live capture requires explicit interface selection and an authorization checkbox in the Overview capture panel
 - [x] `safe_response.enabled` default **false**
 - [x] Real firewall path requires root **and** `allow_firewall_changes: true` **and** target inside lab CIDR allow-list **and** explicit confirm
 - [x] Default simulated response = in-memory block list affecting *displayed* traffic only
