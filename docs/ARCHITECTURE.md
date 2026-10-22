@@ -374,7 +374,7 @@ All responses use one envelope:
 - [x] **R5 Unusual connection rate:** source's connection rate exceeds `conn_rate_threshold` (per window) **and** is ≥ `conn_rate_multiplier`× the source's own baseline
 - [x] **R6 Absolute traffic spike:** packet rate in second bucket ≥ `spike_absolute_pps` → alert
 - [x] **R7 Baseline deviation spike:** packet rate ≥ `spike_baseline_ratio`× EWMA baseline **and** ≥ `spike_min_pps` → alert
-- [x] **R8 Half-open pattern:** ≥ `half_open_threshold` SYN-without-SYN-ACK from one source → alert (explicitly labelled *inferred*)
+- [x] ~~R8 Half-open pattern~~ — merged into R3 during Phase 5 (see §6 note)
 - [x] All thresholds configurable via `config/thresholds.toml`
 - [x] Isolated single connection never flagged
 - [x] Duplicate alert suppression via fingerprint + suppression window
@@ -451,29 +451,47 @@ All values live in `config/thresholds.toml` and are editable at runtime via Sett
 > student laptop. TOML still supports comments and nested sections, so
 > readability is preserved. The file is still human-editable and auditable.
 
-```yaml
-detection:
-  port_scan:
-    window_seconds: 60
-    distinct_port_threshold: 15     # R1 distinct dst ports, same dst
-    distinct_host_threshold: 20     # R2 distinct dst hosts
-    min_packets_per_target: 10      # guards against trivial/truncated captures
-  suspicious:
-    window_seconds: 60
-    repeat_attempt_threshold: 15    # R3 attempts to same (src, dst_port)
-    conn_rate_threshold: 60         # R5 connections per window
-    conn_rate_multiplier: 3.0       # × source's own baseline
-    half_open_threshold: 20         # R8 SYN w/o SYN-ACK
-    sensitive_ports: [22, 23, 445, 1433, 3306, 3389, 5432, 5900, 6379, 9200]
-  spike:
-    window_seconds: 10
-    spike_absolute_pps: 500         # R6 packets/sec in bucket
-    spike_baseline_ratio: 3.0       # R7 multiple of EWMA baseline
-    spike_min_pps: 100              # floor so a low baseline can't trigger R7
-    baseline_alpha: 0.3             # EWMA smoothing factor
-  dedup:
-    suppression_seconds: 300        # same fingerprint within window → suppressed
+```toml
+[detection.port_scan]
+window_seconds = 60
+distinct_port_threshold = 15     # R1 distinct dst ports, same dst
+distinct_host_threshold = 20     # R2 distinct dst hosts
+min_packets_per_target = 10      # guards against trivial/truncated captures
+
+[detection.suspicious]
+window_seconds = 60
+repeat_attempt_threshold = 15    # R3 unanswered SYNs to one dst port
+conn_rate_threshold = 300        # R5 TCP connections per 60s window
+conn_rate_multiplier = 3.0       # x source's own baseline
+conn_baseline_alpha = 0.3
+conn_baseline_min_samples = 3
+sensitive_ports = [21, 22, 23, 445, 1433, 3306, 3389, 5432, 5900, 6379, 9200, 27017]
+
+[detection.spike]
+window_seconds = 10
+baseline_window_seconds = 300
+spike_absolute_pps = 500         # R6 packets/sec in bucket
+spike_baseline_ratio = 3.0       # R7 multiple of EWMA baseline
+spike_min_pps = 100              # floor so a low baseline can't trigger R7
+baseline_alpha = 0.3
+baseline_min_samples = 3
+
+[detection.dedup]
+suppression_seconds = 300        # same fingerprint within window -> suppressed
 ```
+
+> **Rule-set refinement during implementation (Phase 5):** R8
+> (`HALF_OPEN_PATTERN`) was **merged into R3**. Both described "SYNs without
+> SYN-ACK"; keeping both produced two alerts for one observation without adding
+> independent evidence. R3 now means *unanswered SYNs to one destination
+> service*, which is the packet-metadata approximation of "repeated failed
+> attempts" and is explicitly marked as insufficient evidence.
+>
+> Two further corrections came from false-positive testing:
+> * Port-scan counting includes **only connection attempts** (SYN / UDP), never
+>   replies. Otherwise the victim of a scan is flagged as the scanner.
+> * R3/R5 count **only TCP SYNs**. Counting UDP made ordinary DNS traffic look
+>   like repeated connection attempts.
 
 **Initial threshold rationale (defend this in the viva):**
 - `distinct_port_threshold: 15` — typical admin services + a few apps sit below 15 distinct ports per host per minute; service-discovery tools and scanners exceed it. Deliberately conservative to favour low false positives over recall.
@@ -490,8 +508,8 @@ score = clamp( rule_base + volume_bonus + frequency_bonus, 0, 100 )
 
 rule_base:      PORT_SCAN_PORTS=40  PORT_SCAN_HOSTS=40
                 REPEATED_CONNECTIONS=30  SENSITIVE_PORT=25
-                CONN_RATE_ANOMALY=30  TRAFFIC_SPIKE=35
-                BASELINE_DEVIATION=45  HALF_OPEN_PATTERN=35
+                CONN_RATE_ANOMALY=30  TRAFFIC_SPIKE=45
+                BASELINE_DEVIATION=40
 
 volume_bonus:   min(30, floor(observed/required × 30))
                 e.g. 30 ports against a threshold of 15 → ratio 2.0 → +30
@@ -509,12 +527,11 @@ evidence gate:  if evidence_sufficient is False → severity = min(severity, med
 |---|---|
 | PORT_SCAN_PORTS | distinct ports ≥ threshold AND packets to target ≥ `min_packets_per_target` |
 | PORT_SCAN_HOSTS | distinct hosts ≥ threshold AND packets ≥ threshold |
-| REPEATED_CONNECTIONS | attempts ≥ threshold AND attempts spread over ≥ 2 distinct source ports (else it's one busy app) |
+| REPEATED_CONNECTIONS | unanswered SYNs ≥ threshold — but **always** marked insufficient, because asymmetric capture is indistinguishable from a closed service |
 | SENSITIVE_PORT | single connection → **insufficient** by itself (needs corroboration) unless the source is internal + port is admin-exposed |
 | CONN_RATE_ANOMALY | rate ≥ threshold AND ≥ multiplier×baseline AND baseline has ≥ 3 samples (a baseline from 1 sample is not a baseline) |
 | TRAFFIC_SPIKE | absolute rate exceeded — sufficient as a *rate* observation; the alert title must not say "DDoS" |
 | BASELINE_DEVIATION | ratio + floor both met AND baseline samples ≥ 3 |
-| HALF_OPEN_PATTERN | **insufficient** for attack attribution by construction (asymmetric capture) — capped at medium, labelled as inference |
 
 **Example reasons[] strings** (auto-generated, so the UI never needs hand-written text):
 - `"Distinct destination ports 30 ≥ threshold 15 within 60s window"`
