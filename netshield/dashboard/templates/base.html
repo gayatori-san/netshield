@@ -68,6 +68,16 @@
           <span id="capturePillText">idle</span>
         </span>
         <button class="btn btn-sm btn-danger hidden" id="stopCapture" type="button">Stop capture</button>
+        {% if auth_user %}
+        <div class="user-chip" title="{{ auth_user.email or auth_user.uid }}">
+          <span class="user-avatar" aria-hidden="true">{{ auth_user.initials }}</span>
+          <span class="user-meta">
+            <span class="user-name">{{ auth_user.display_name }}</span>
+            <span class="user-role">{{ 'administrator' if auth_user.is_admin else 'operator' }}</span>
+          </span>
+          <button class="btn btn-sm" id="signOutButton" type="button">Sign out</button>
+        </div>
+        {% endif %}
       </div>
     </header>
 
@@ -84,6 +94,10 @@
 
 <div class="toasts" id="toasts" role="status" aria-live="polite"></div>
 
+<script id="firebase-web-config" type="application/json">{{ firebase_web_config_json|safe }}</script>
+<script src="{{ url_for('static', filename='vendor/firebase/firebase-app-compat.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/firebase/firebase-auth-compat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
 <script src="{{ url_for('static', filename='js/api.js') }}"></script>
 <script src="{{ url_for('static', filename='js/app.js') }}"></script>
 {% block scripts %}{% endblock %}

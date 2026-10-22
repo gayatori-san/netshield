@@ -1,12 +1,50 @@
+# Render Blueprint for NetShield.
+#
+# The SQLite database lives on a persistent disk so incidents survive deploys.
+# Run ONE Gunicorn worker: capture state is in-process. Threads provide
+# concurrency without splitting that state.
 services:
   - type: web
     name: netshield
     runtime: python
-    plan: free
+    plan: starter
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT wsgi:app
+    startCommand: gunicorn --workers 1 --threads 4 --timeout 120 --access-logfile - --bind 0.0.0.0:$PORT wsgi:app
+    healthCheckPath: /api/health
+    autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.8
       - key: NETSHIELD_DB_PATH
-        value: /tmp/netshield.db
-      - key: NETSHIELD_HOST
-        value: 0.0.0.0
+        value: /var/data/netshield.db
+      - key: NETSHIELD_CONFIG
+        value: config/thresholds.toml
+      - key: NETSHIELD_TRUST_PROXY
+        value: "true"
+      - key: NETSHIELD_COOKIE_SECURE
+        value: "true"
+      - key: NETSHIELD_SECRET_KEY
+        generateValue: true
+      - key: NETSHIELD_AUTH_RATE_LIMIT
+        value: "30"
+      # Public Firebase web identifiers (Firebase Console -> Project settings ->
+      # Your apps -> Web app -> SDK setup and configuration).
+      - key: FIREBASE_WEB_API_KEY
+        sync: false
+      - key: FIREBASE_AUTH_DOMAIN
+        sync: false
+      - key: FIREBASE_PROJECT_ID
+        sync: false
+      - key: FIREBASE_STORAGE_BUCKET
+        sync: false
+      - key: FIREBASE_MESSAGING_SENDER_ID
+        sync: false
+      - key: FIREBASE_APP_ID
+        sync: false
+      # Paste the service-account JSON as one line/value. Never commit it.
+      - key: FIREBASE_SERVICE_ACCOUNT_JSON
+        sync: false
+    disk:
+      name: netshield-data
+      mountPath: /var/data
+      sizeGB: 1

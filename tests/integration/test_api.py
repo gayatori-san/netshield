@@ -29,8 +29,8 @@ def isolate_uploads(tmp_path, fixtures_dir, monkeypatch):
 
 
 @pytest.fixture
-def app(settings):
-    application = create_app(settings, demo_pace=False)
+def app(settings, stub_auth):
+    application = create_app(settings, demo_pace=False, auth_backend=stub_auth)
     application.config.update(TESTING=True)
     yield application
     application.extensions["netshield"].pipeline.stop()
@@ -38,8 +38,8 @@ def app(settings):
 
 
 @pytest.fixture
-def client(app):
-    return app.test_client()
+def client(app, auth_client):
+    return auth_client(app)
 
 
 def services(app):

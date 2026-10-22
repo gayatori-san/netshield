@@ -29,6 +29,7 @@ from netshield.api.validation import (
     json_object,
     optional_note,
 )
+from netshield.auth.guard import require_permission
 from netshield.capture.pcap import has_capture_signature
 from netshield.config.settings import PROJECT_ROOT
 from netshield.models import RULE_TITLES
@@ -429,6 +430,7 @@ def capture_status():
 
 
 @api.post("/response")
+@require_permission("admin")
 def response_action():
     state = services()
     body = json_object()

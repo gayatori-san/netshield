@@ -7,7 +7,7 @@ Phase 2 architecture contract and has been reconciled with the implementation.
 **Date:** 2026-10-22
 
 > **Implementation status:** all ten phases are implemented and the test suite reports
-> **190 passed**. Two deviations from the original plan are intentional and documented
+> **268 passed**. Two deviations from the original plan are intentional and documented
 > here and in the README: the configuration format is TOML rather than YAML, and live
 > capture plus safe-response work landed in Phases 6-7 rather than Phase 9, so the
 > dashboard could be built against the final API. The dashboard is server-rendered
@@ -30,7 +30,8 @@ Phase 2 architecture contract and has been reconciled with the implementation.
 - Payload inspection / IDS signature matching (no Suricata/Snort rules).
 - Machine learning classification.
 - Distributed processing, message brokers, cloud databases.
-- Multi-tenant auth (single-analyst local tool; no login system).
+- Multi-tenant auth or per-account data isolation. A single Firebase project
+  authenticates operators; the `admin` custom claim gates real firewall actions.
 - Attack traffic generation of any kind (we never *send* malicious traffic — the synthetic generator emits **benign-shaped** traffic only, used to drive the detectors).
 
 ---
@@ -195,6 +196,13 @@ netshield/
 │   │   ├── schema.sql
 │   │   └── repositories.py        # incidents, packets, buckets, responses, CSV
 │   ├── pipeline.py                # queue + worker + detector fan-out + prune
+│   ├── auth/
+│   │   ├── __init__.py
+│   │   ├── backend.py             # Firebase Admin, token/session verification
+│   │   ├── guard.py               # before_request auth, cookie/Bearer split, permissions
+│   │   ├── routes.py              # /login, session exchange, logout, /me
+│   │   ├── rate_limit.py          # in-process sign-in limiter
+│   │   └── urls.py                # same-site safe-next validation
 │   ├── api/
 │   │   ├── __init__.py
 │   │   ├── app.py                 # create_app(), teardown, security headers
@@ -204,8 +212,8 @@ netshield/
 │   ├── dashboard/
 │   │   ├── __init__.py
 │   │   ├── routes.py              # UI blueprint
-│   │   ├── templates/             # base + four pages
-│   │   └── static/                # css, js, img, vendor (Chart.js)
+│   │   ├── templates/             # base + four dashboard pages + login
+│   │   └── static/                # css, js, img, vendor (Chart.js, Firebase)
 │   └── responses.py               # simulated + lab-gated iptables response
 ├── config/thresholds.toml         # all tunable detection thresholds
 ├── data/                          # SQLite db and uploaded pcaps (gitignored)
@@ -219,11 +227,13 @@ netshield/
 │   └── screenshots/               # verified dashboard captures
 ├── tests/
 │   ├── conftest.py                # settings, fixtures_dir, packet_factory, replay
+│   ├── auth_support.py            # deterministic stub Firebase backend for tests
 │   ├── fixtures/                  # committed PCAPs (normal, scan, sweep, spike, bad)
-│   ├── unit/                      # pcap, features, detectors, dedup, scoring, storage, responses
-│   └── integration/               # pipeline, API contract, dashboard
+│   ├── unit/                      # pcap, features, detectors, scoring, storage, auth backend
+│   └── integration/               # pipeline, API contract, dashboard, auth
 ├── tools/generate_fixtures.py     # deterministic offline PCAP generator
-├── run.py                         # entry point
+├── run.py                         # local development entry point
+├── wsgi.py                        # Gunicorn/Render entry point
 ├── requirements.txt               # scapy, Flask (pinned)
 ├── requirements-dev.txt           # + pytest
 ├── .env.example
@@ -649,7 +659,7 @@ CREATE TABLE settings (
 | **7** | `api/app.py`, `routes.py`, `validation.py`, `errors.py` | Every endpoint returns the envelope; invalid params → 400 with field detail; missing incident → 404; API test suite passes |
 | **8** | `dashboard/*` wired to real API | Every panel renders from an API response; **no hardcoded sample data in the monitoring surface**; empty states explain why empty. Completed with Jinja shells + vanilla JS and browser verification. |
 | **9** | `capture/live.py`, `responses.py`, capture control endpoints, Settings UI | Live capture starts/stops on an explicit iface; permission denial produces the actionable error; simulated response blocks *displayed* traffic; real firewall path refuses non-lab targets. **Delivered early in Phases 6-7** because the API and dashboard needed the final behavior. |
-| **10** | Integration, full `pytest` run, README, THREAT_MODEL, DEMO_SCRIPT, VIVA_QUESTIONS, screenshots | `pytest` green with a real report; documented known limitations; screenshots of the running dashboard. 190 passing; docs and screenshots committed. |
+| **10** | Integration, full `pytest` run, README, THREAT_MODEL, DEMO_SCRIPT, VIVA_QUESTIONS, screenshots | `pytest` green with a real report; documented known limitations; screenshots of the running dashboard. Current suite: 268 passing; docs and screenshots updated, commit pending. |
 
 **Working rules for every phase**
 1. Write the module → write its test → run the test → **paste the actual output**.
@@ -686,10 +696,10 @@ CREATE TABLE settings (
 6. Single-process, in-memory feature windows — no horizontal scale, and windows reset on restart.
 7. No payload inspection → no signature-based detection, no TLS/hostname visibility.
 8. Clock skew or deliberate timestamp manipulation in a PCAP could distort the sliding windows.
-9. No authentication: the server is loopback-only by default and is not safe to expose.
+9. Authorization is coarse: Firebase authentication is mandatory, but any active account can control capture and triage. Only real firewall actions require the `admin` custom claim; there is no per-account audit trail or data isolation.
 10. Windows live capture is unsupported; PCAP replay and the demo are cross-platform.
 11. A capture that reuses a database accumulates incidents across runs by design; use a scratch database for exact demo counts.
-12. The dashboard was verified in headless Chromium at three widths; Safari/Firefox are not part of the automated check.
+12. The core dashboard was verified in headless Chromium at three widths before authentication was added. The unconfigured login state was captured at 1440x1000 in headless Firefox (`docs/screenshots/login.png`), and the auth routes are covered by integration tests. A real Firebase sign-in flow was not visually exercised here because no project credentials were supplied; Safari and Firefox are not part of the automated check.
 
 ---
 

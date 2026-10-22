@@ -1,9 +1,9 @@
 # NetShield threat model
 
 Scope: the NetShield application as shipped in this repository, run locally for
-coursework. It is a single-user teaching tool with no authentication and no cloud
-components. This document states what it protects, what it does not, and which controls
-are enforced where.
+coursework or on a single Render instance. A single Firebase project authenticates
+operators; captured metadata and incidents are stored in SQLite. This document states
+what it protects, what it does not, and which controls are enforced where.
 
 ## 1. Assets
 
@@ -24,7 +24,7 @@ payloads are never captured or stored by NetShield.
 | Actor | Trust |
 |---|---|
 | Local operator running the server | Trusted; has filesystem and process control |
-| Browser on the same machine | Trusted-ish; the server has no auth, so any local process can call the API |
+| Browser/API client with a valid Firebase credential | Trusted-ish; authorization is limited to authenticated vs admin (firewall only) |
 | Anyone who can reach the bound port | **Untrusted** if the operator binds beyond loopback |
 | Uploaded PCAP file | Untrusted input |
 | Observed network traffic | Untrusted data; fields may be spoofed or malformed |
@@ -126,18 +126,24 @@ quoted CSV writer escaping, and honours the same filters as the UI. Verified by 
 bounded (`per_page` max 500, enums for severity/status/rule, text length limits); sort
 order is fixed in code, never taken from the request.
 
-### T8. Exposure of an unauthenticated admin surface
+### T8. Exposure of an administrative surface
 
-**Threat:** anyone on the LAN starts captures, changes thresholds, or triggers response
-actions.
+**Threat:** anyone who can reach the app starts captures, changes thresholds, or
+triggers response actions.
 
-**Controls:** default bind is loopback; `run.py` prints a warning when binding beyond
-loopback; the README and UI state there is no login. There is no CSRF token because
-there are no cookies or sessions that grant authority; the API is same-origin and
-loopback-only by default.
+**Controls:** every page and API except `/api/health`, `/login`, static assets, and
+the session-mint/logout endpoints requires a Firebase credential verified server-side
+with the Admin SDK. The session endpoint itself requires a Bearer ID token. Page
+navigation uses an HttpOnly, SameSite=Lax session cookie; state-changing API calls
+require a Bearer ID token, so a cross-site request cannot reuse the cookie. The
+session-minting endpoint is rate limited per IP; real firewall actions additionally
+require the `admin` custom claim; invalid or unavailable verification fails closed.
+Production runs behind TLS (Render) with `Secure` cookies.
 
-**Residual:** if bound to `0.0.0.0`, any reachable client has full control. This is
-documented as unsupported for shared networks.
+**Residual:** a compromised operator account can control capture and alerts; admin
+account compromise can alter host firewall rules. There is no per-account data
+isolation or MFA beyond what the Firebase project enforces. Accounts should be
+provisioned deliberately and removed when no longer needed.
 
 ### T9. Misleading detection output
 
@@ -196,8 +202,8 @@ untrusted pcap/live packet
 
 ## 5. Out of scope
 
-- Multi-user authentication, RBAC, audit of who did what.
-- TLS termination; run behind a local reverse proxy if remote access is ever required.
+- Fine-grained RBAC and a per-account audit trail (all signed-in operators share one console).
+- Application-level TLS termination; Render or a reverse proxy provides HTTPS.
 - Payload-level IDS, malware detection, TLS inspection.
 - Distributed capture, high-availability, long-term forensic storage.
 - Windows live capture and non-Linux firewall backends.

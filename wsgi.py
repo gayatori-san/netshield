@@ -1,22 +1,13 @@
-"""Production WSGI entry point for hosted deployments.
+"""Production WSGI entry point.
 
-Run with:
-    gunicorn --bind 0.0.0.0:$PORT wsgi:app
+Gunicorn must run exactly one worker: the capture pipeline and its feature
+windows live in process memory. Use threads for concurrency.
 
-The hosted service is for the web dashboard and offline/demo analysis.
-Live packet capture and real firewall actions should remain disabled on a
-public multi-tenant host.
+    gunicorn --workers 1 --threads 4 --bind 0.0.0.0:$PORT wsgi:app
 """
-import os
 
-# Render provides PORT. Keep SQLite in the ephemeral writable filesystem
-# unless NETSHIELD_DB_PATH is explicitly configured to a persistent disk.
-os.environ.setdefault("NETSHIELD_HOST", "0.0.0.0")
-os.environ.setdefault("NETSHIELD_PORT", os.environ.get("PORT", "10000"))
-os.environ.setdefault("NETSHIELD_DB_PATH", "/tmp/netshield.db")
+from __future__ import annotations
 
 from netshield.api.app import create_app
-from netshield.config.settings import load_settings
 
-settings = load_settings()
-app = create_app(settings, demo_pace=False)
+app = create_app()

@@ -13,26 +13,36 @@
     }
   }
 
-  async function request(path, options = {}) {
-    const init = {
-      method: options.method || "GET",
-      headers: Object.assign({ Accept: "application/json" }, options.headers || {}),
-      credentials: "same-origin",
-    };
-    if (options.body !== undefined) {
-      init.headers["Content-Type"] = "application/json";
-      init.body = JSON.stringify(options.body);
-    }
-    if (options.signal) init.signal = options.signal;
+  function isSafeMethod(init) {
+    const method = String(init.method || "GET").toUpperCase();
+    return method === "GET" || method === "HEAD" || method === "OPTIONS";
+  }
 
+  async function authorized(path, init, forceToken) {
+    const headers = Object.assign({}, init.headers || {});
+    if (window.NetShieldAuth && window.NetShieldAuth.ready) {
+      try {
+        headers.Authorization = `Bearer ${await window.NetShieldAuth.getIdToken(forceToken)}`;
+      } catch (err) {
+        if (!isSafeMethod(init)) {
+          window.NetShieldAuth.redirectToLogin();
+          throw new ApiError(401, {
+            error: { message: "Your session expired. Sign in again.", code: "unauthenticated" },
+          });
+        }
+      }
+    }
     let response;
     try {
-      response = await fetch(path, init);
+      response = await fetch(path, Object.assign({}, init, { headers }));
     } catch (err) {
       if (err.name === "AbortError") throw err;
       throw new ApiError(0, { error: { message: "Network unreachable", code: "network" } });
     }
+    return response;
+  }
 
+  async function parseResponse(response) {
     if (response.status === 204) return { ok: true, data: null };
     let payload = null;
     const type = response.headers.get("Content-Type") || "";
@@ -45,23 +55,38 @@
     return payload || { ok: true, data: null };
   }
 
+  async function request(path, options = {}) {
+    const init = {
+      method: options.method || "GET",
+      headers: Object.assign({ Accept: "application/json" }, options.headers || {}),
+      credentials: "same-origin",
+    };
+    if (options.body !== undefined) {
+      init.headers["Content-Type"] = "application/json";
+      init.body = JSON.stringify(options.body);
+    }
+    if (options.signal) init.signal = options.signal;
+
+    let response = await authorized(path, init, false);
+    if (response.status === 401 && options.retryAuth !== false) {
+      response = await authorized(path, init, true);
+      if (response.status === 401 && window.NetShieldAuth) {
+        window.NetShieldAuth.redirectToLogin();
+      }
+    }
+    return parseResponse(response);
+  }
+
   async function upload(path, formData) {
-    let response;
-    try {
-      response = await fetch(path, { method: "POST", body: formData, credentials: "same-origin" });
-    } catch (err) {
-      throw new ApiError(0, { error: { message: "Network unreachable", code: "network" } });
+    const init = { method: "POST", body: formData, credentials: "same-origin" };
+    let response = await authorized(path, init, false);
+    if (response.status === 401) {
+      response = await authorized(path, init, true);
+      if (response.status === 401 && window.NetShieldAuth) {
+        window.NetShieldAuth.redirectToLogin();
+      }
     }
-    let payload = null;
-    try {
-      payload = await response.json();
-    } catch (err) {
-      payload = null;
-    }
-    if (!response.ok || (payload && payload.ok === false)) {
-      throw new ApiError(response.status, payload);
-    }
-    return payload;
+    return parseResponse(response);
   }
 
   const pad = (n) => String(n).padStart(2, "0");

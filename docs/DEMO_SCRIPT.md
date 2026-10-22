@@ -5,17 +5,23 @@ built-in labelled demo, so it needs no root, no network traffic, and no attack t
 
 ## Before the session (2 minutes)
 
+Configure Firebase and create the demo account first (README -> Authentication), then:
+
 ```bash
 cd netshield
 . .venv/bin/activate
 NETSHIELD_DB_PATH=/tmp/netshield-demo.db python run.py
 ```
 
-Open <http://127.0.0.1:5000/>. A scratch database keeps the demo counts predictable.
-If a previous run left data, stop the server and delete `/tmp/netshield-demo.db*`.
+Open <http://127.0.0.1:5000/> and sign in. A scratch database keeps the demo counts
+predictable. If a previous run left data, stop the server and delete
+`/tmp/netshield-demo.db*`. Use an account with the `admin` claim if you plan to
+demonstrate response actions; other operators can capture and triage but receive
+`403 forbidden` for `/api/response`.
 
-Checklist:
+Checklist (after sign-in):
 
+- The top bar shows the operator chip and **Sign out**.
 - Overview shows "no capture yet" and the origin badge says "origin unknown".
 - Alerts is empty with a reason, not a fake table.
 - Browser zoom is 100%; the layout also works at 1024 px and on a phone (nav collapses).
@@ -112,7 +118,8 @@ Key line for the viva: the repeated-SSH alert scores 65 but is capped at medium 
 4. Explain the response model: simulation is in-memory; the firewall path needs four
    independent gates plus an exact token. Do not enable it during the demo unless asked.
 5. Close on limitations: heuristics, NAT/spoofing, asymmetric capture, no payload
-   inspection, no authentication, loopback-only default.
+   inspection. Authentication is required; accounts are provisioned in Firebase and
+   only admins may apply real firewall actions.
 
 ![Settings](screenshots/settings.png)
 

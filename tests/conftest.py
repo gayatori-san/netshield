@@ -54,6 +54,26 @@ def packet_factory():
 
 
 @pytest.fixture
+def stub_auth():
+    from tests.auth_support import StubAuthBackend
+
+    return StubAuthBackend()
+
+
+@pytest.fixture
+def auth_client(stub_auth):
+    def make(app, token="admin-token", use_session_cookie=False):
+        client = app.test_client()
+        if use_session_cookie:
+            client.set_cookie("netshield_session", f"session:{token}")
+        else:
+            client.environ_base["HTTP_AUTHORIZATION"] = f"Bearer {token}"
+        return client
+
+    return make
+
+
+@pytest.fixture
 def replay(fixtures_dir):
     """Run one or more detectors over a fixture PCAP and return candidates."""
     from netshield.capture.pcap import PcapSource

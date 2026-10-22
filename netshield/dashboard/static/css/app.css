@@ -202,6 +202,47 @@ h1, h2, h3, p { margin: 0; }
 .origin-badge.demo { color: var(--warn); border-color: rgba(251, 191, 36, 0.45); background: rgba(251, 191, 36, 0.08); }
 .origin-badge.real { color: var(--accent); border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.08); }
 
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 5px 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--panel);
+  min-width: 0;
+}
+.user-avatar {
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-dim);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.user-meta { display: flex; flex-direction: column; min-width: 0; line-height: 1.15; }
+.user-name {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+}
+.user-role {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 9px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+.user-chip .btn { border-radius: 999px; }
+
 .pill {
   display: inline-flex;
   align-items: center;
@@ -605,7 +646,7 @@ pre.json {
 .mt-8 { margin-top: 8px; }
 .mt-16 { margin-top: 16px; }
 .right { text-align: right; }
-.hidden { display: none !important; }
+.hidden, [hidden] { display: none !important; }
 .sr-only {
   position: absolute;
   width: 1px; height: 1px;
@@ -649,6 +690,8 @@ pre.json {
   .nav a { padding: 7px 10px; white-space: nowrap; }
   .nav a.active::before { display: none; }
   .topbar { padding: 14px 18px; }
+  .user-meta { display: none; }
+  .user-chip { gap: 6px; }
   .content { padding: 18px 18px 32px; }
   .grid.cols-3 { grid-template-columns: minmax(0, 1fr); }
 }

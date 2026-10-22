@@ -24,6 +24,7 @@ BANNER = """\
   URL       : http://{host}:{port}/
   Database  : {db}
   Capture   : replay a PCAP, run the demo, or sniff an interface
+  Auth      : Firebase sign-in required; admins may apply firewall actions
   Safety    : simulated response by default; real firewall changes stay off
   Warning   : observe only traffic you are authorised to capture.
 """
@@ -61,12 +62,19 @@ def main(argv: list[str] | None = None) -> int:
 
     app = create_app(settings, demo_pace=not args.no_demo_pace)
     pipeline = app.extensions["netshield"].pipeline
+    auth = app.extensions["auth"]
 
     print(BANNER.format(host="127.0.0.1" if host in ("0.0.0.0", "::") else host, port=port, db=settings.db_path))
+    if not auth.ready:
+        print(
+            "  WARNING: Firebase Authentication is not configured. All pages and\n"
+            "           APIs except /api/health and /login stay locked. See README.\n",
+            file=sys.stderr,
+        )
     if host not in ("127.0.0.1", "localhost", "::1"):
         print(
-            "  NOTE: the dashboard has no authentication. Binding beyond loopback\n"
-            "        exposes capture controls to anyone who can reach this port.\n",
+            "  NOTE: binding beyond loopback exposes capture controls to the network.\n"
+            "        Sign-in is enforced, but use TLS (Render or a reverse proxy).\n",
             file=sys.stderr,
         )
 

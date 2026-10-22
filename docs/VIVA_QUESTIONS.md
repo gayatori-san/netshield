@@ -163,9 +163,11 @@ addresses rotate. Blocking is containment theatre unless the network path is con
 The tool treats it as a lab exercise, not a control.
 
 **31. What is the biggest security weakness?**
-No authentication. It is mitigated by binding to loopback and stating that binding
-beyond it is unsupported. A multi-user deployment would need auth, CSRF protection, TLS,
-and per-user authorization.
+Coarse authorization and account lifecycle, not missing authentication. Any signed-in
+operator can control capture and triage, and a compromised admin account can change host
+firewall rules. Mitigations are deliberate Firebase account provisioning, TLS, Bearer
+tokens for writes, an admin custom claim for firewall actions, rate limiting, and
+fail-closed verification. A stricter deployment would add per-user roles and audit.
 
 **32. What about capturing other people's traffic?**
 The tool cannot verify authorization. The UI requires an explicit confirmation, the
@@ -175,9 +177,11 @@ data. This is a policy control with a technical reminder, not a guarantee.
 ## Testing and limitations
 
 **33. How many tests and what do they cover?**
-190 tests: PCAP tolerance, feature counters, each rule below/at/above threshold,
+268 tests: PCAP tolerance, feature counters, each rule below/at/above threshold,
 false-positive regressions, scoring and the gate, dedup, storage, API contract, response
-gates, dashboard pages/headers. No test opens a live capture or sends traffic.
+gates, dashboard pages/headers, and Firebase authentication (mocked): redirects,
+missing/expired/revoked tokens, session cookies, write-token enforcement, admin claims,
+fail-closed outages, and rate limiting. No test opens a live capture or sends traffic.
 
 **34. Give an example of a false-positive test.**
 `normal_day.pcap` (308 packets of ordinary traffic) must produce zero incidents.
@@ -186,13 +190,13 @@ Another test asserts that a lone connection is never flagged as a port scan.
 **35. What are the main limitations?**
 Heuristics are not proof; asymmetric capture confuses failed connections; a rate spike
 is not a DDoS; no payload inspection; in-memory state resets; Wi-Fi sees only local
-traffic; no auth; IPv4/IPv6 blocking is unreliable. Full list in README and
+traffic; coarse authorization; IPv4/IPv6 blocking is unreliable. Full list in README and
 `docs/THREAT_MODEL.md`.
 
 **36. What would you improve with more time?**
 Per-source baselines persisted across restarts, a proper incident workflow with
 assignment, IPv6-aware lab policies, configurable rule enable/disable, structured
-logging/metrics, authentication if it ever leaves loopback, and PCAP-bounded streaming
+logging/metrics, per-user RBAC and audit, and PCAP-bounded streaming
 instead of loading the whole file.
 
 **37. Why not machine learning?**

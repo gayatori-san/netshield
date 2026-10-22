@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="description" content="Sign in to the NetShield detection console.">
+  <title>Sign in · NetShield</title>
+  <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='img/shield.svg') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+</head>
+<body class="auth-body">
+<main class="auth-shell" data-login data-ready="{{ 'true' if auth_ready else 'false' }}" data-next="{{ next_path }}">
+  <section class="auth-brand" aria-label="NetShield">
+    <div class="auth-brand-mark" aria-hidden="true">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 20 6v6c0 5-3.4 8.6-8 10-4.6-1.4-8-5-8-10V6Z"/>
+        <path d="M8 12h2.4l1.2-3 1.8 6 1.2-3H18"/>
+      </svg>
+    </div>
+    <div>
+      <h1 class="auth-wordmark">NetShield</h1>
+      <p class="auth-tagline">Network attack detection console</p>
+    </div>
+    <p class="auth-note">
+      Observe only traffic you are authorised to capture. This build is an
+      educational lab tool, not a production intrusion-prevention system.
+    </p>
+  </section>
+
+  <section class="auth-panel" aria-labelledby="loginTitle">
+    {% if not auth_ready %}
+    <div class="auth-alert" role="alert">
+      <strong>Authentication is not configured yet.</strong>
+      {% if web_error %}<p>{{ web_error }}</p>{% endif %}
+      {% if admin_error %}<p>{{ admin_error }}</p>{% endif %}
+      <p>Set the Firebase environment variables on the server, then reload this page.</p>
+    </div>
+    {% endif %}
+
+    <h2 id="loginTitle">Sign in</h2>
+    <p id="loginSubtitle" class="auth-subtitle">Use your NetShield account to open the detection console.</p>
+
+    <form id="loginForm" class="auth-form" novalidate>
+      <label class="auth-field" for="email">
+        <span>Email address</span>
+        <input id="email" name="email" type="email" autocomplete="email" inputmode="email"
+               required spellcheck="false" placeholder="operator@example.com">
+      </label>
+
+      <label class="auth-field" for="password">
+        <span>Password</span>
+        <span class="auth-password">
+          <input id="password" name="password" type="password" autocomplete="current-password"
+                 required minlength="8" placeholder="At least 8 characters">
+          <button type="button" id="togglePassword" class="auth-reveal" aria-pressed="false">Show</button>
+        </span>
+      </label>
+
+      <button type="submit" id="loginSubmit" class="btn auth-submit" disabled>Sign in</button>
+
+      <div class="auth-links">
+        <button type="button" id="forgotPassword" class="auth-link">Forgot password?</button>
+        <span class="auth-links-note">Reset is emailed by Firebase. Accounts are provisioned by an administrator.</span>
+      </div>
+
+      <p id="loginMessage" class="auth-message" role="status" aria-live="polite" hidden></p>
+    </form>
+
+    <p class="auth-fineprint">
+      Access is verified on the server with Firebase Authentication. Sessions are
+      stored in an HttpOnly cookie; API writes require a fresh ID token.
+    </p>
+  </section>
+</main>
+
+<script id="firebase-web-config" type="application/json">{{ firebase_web_config_json|safe }}</script>
+<script src="{{ url_for('static', filename='vendor/firebase/firebase-app-compat.js') }}"></script>
+<script src="{{ url_for('static', filename='vendor/firebase/firebase-auth-compat.js') }}"></script>
+<script src="{{ url_for('static', filename='js/auth.js') }}"></script>
+<script src="{{ url_for('static', filename='js/login.js') }}"></script>
+</body>
+</html>

@@ -24,6 +24,9 @@ data/pcaps/*.pcapng
 .env
 *.env
 !.env.example
+service-account*.json
+*service-account*.json
+firebase-adminsdk-*.json
 
 # Tooling
 .pytest_cache/

@@ -61,6 +61,40 @@ class ForbiddenError(ApiError):
     code = "forbidden"
 
 
+class UnauthenticatedError(ApiError):
+    status = 401
+    code = "unauthenticated"
+
+    def response(self):
+        response, status = super().response()
+        response.headers["WWW-Authenticate"] = 'Bearer realm="netshield"'
+        return response, status
+
+
+class CsrfError(ApiError):
+    status = 403
+    code = "csrf_required"
+
+
+class AuthUnavailableError(ApiError):
+    status = 503
+    code = "auth_unavailable"
+
+
+class RateLimitError(ApiError):
+    status = 429
+    code = "rate_limited"
+
+    def __init__(self, message: str, *, retry_after: int = 60, **kwargs):
+        super().__init__(message, **kwargs)
+        self.retry_after = max(1, int(retry_after))
+
+    def response(self):
+        response, status = super().response()
+        response.headers["Retry-After"] = str(self.retry_after)
+        return response, status
+
+
 def register_error_handlers(app) -> None:
     @app.errorhandler(ApiError)
     def handle_api_error(error: ApiError):

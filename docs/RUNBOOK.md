@@ -151,13 +151,14 @@ The app logs every attempt in `response_actions`, including refusals.
 
 ```bash
 curl -s http://127.0.0.1:5000/api/health
-curl -s http://127.0.0.1:5000/api/overview | head -c 400
-curl -sI http://127.0.0.1:5000/ | grep -Ei 'content-security|x-frame|x-content'
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' http://127.0.0.1:5000/
+curl -sI http://127.0.0.1:5000/login | grep -Ei 'content-security|x-frame|x-content'
 . .venv/bin/activate && python -m pytest
 ```
 
-Expected: `{"ok": true, ...}`, a CSP header without `unsafe-inline`, and
-`190 passed`.
+Expected: health returns `{"ok": true, ...}`, `/` returns `302` to `/login`, the login
+page carries a CSP without `unsafe-inline`, and `268 passed`. Authenticated API checks
+need a Firebase ID token (`Authorization: Bearer ...`); there is no local bypass.
 
 ## 7. Troubleshooting
 
@@ -174,7 +175,8 @@ Expected: `{"ok": true, ...}`, a CSP header without `unsafe-inline`, and
 | Alerts appear then vanish from a filter | Status filter is `new` and you acknowledged them | Clear the status filter |
 | Settings save says thresholds apply next capture | A capture is running | Stop and start, or accept the next-run behaviour |
 | Blocks do nothing to real traffic | Simulation mode | Only `firewall_block` touches `iptables`, and it is lab-gated |
-| Firewall action returns 403 | Feature off, non-root, non-lab IP, or bad token | Check each gate; the error names the failing one |
+| Firewall action returns 403 | Missing `admin` claim, feature off, non-root, non-lab IP, or bad token | Check each gate; the error names the failing one |
+| Login redirect loop or 503 | Missing/invalid Firebase env or admin credentials | Follow README -> Authentication; the configuration banner names missing keys |
 | Dashboard page blank | CSP or JS load failure | Check the browser console; assets are served from `/static/`, no CDN |
 | Demo overlaps with old rows | Same database reused | Expected; use `--no-demo-pace` with a scratch DB for a clean count |
 | SQLite file grows | Packets are retained for 7 days | Lower `retention.packet_days`; prune runs during capture |
@@ -188,7 +190,9 @@ python run.py 2>&1 | tee netshield.log
 ```
 
 `*.log` is gitignored. Flask's development server is single-process and not intended for
-exposure; do not bind `0.0.0.0` on an untrusted network (there is no authentication).
+exposure. Production uses `wsgi.py` with one Gunicorn worker, TLS, `ProxyFix`, and
+`NETSHIELD_COOKIE_SECURE=true`; see the README Render section. Authentication is
+mandatory, but TLS is still required to protect credentials and session cookies.
 
 ## 9. Upgrade / reinstall
 

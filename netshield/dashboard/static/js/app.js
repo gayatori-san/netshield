@@ -67,5 +67,13 @@
     });
   }
 
+  const signOutButton = document.getElementById("signOutButton");
+  if (signOutButton && window.NetShieldAuth) {
+    signOutButton.addEventListener("click", () => {
+      signOutButton.disabled = true;
+      window.NetShieldAuth.signOut();
+    });
+  }
+
   NS.poll(refreshStatus, 2000);
 })();

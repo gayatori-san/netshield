@@ -9,9 +9,9 @@ from netshield.config.settings import load_settings
 
 
 @pytest.fixture
-def app(tmp_path):
+def app(tmp_path, stub_auth):
     settings = load_settings().with_overrides(db_path=tmp_path / "ui.db")
-    application = create_app(settings, demo_pace=False)
+    application = create_app(settings, demo_pace=False, auth_backend=stub_auth)
     application.config.update(TESTING=True)
     yield application
     application.extensions["netshield"].pipeline.stop()
@@ -19,8 +19,8 @@ def app(tmp_path):
 
 
 @pytest.fixture
-def client(app):
-    return app.test_client()
+def client(app, auth_client):
+    return auth_client(app, use_session_cookie=True)
 
 
 PAGES = [
@@ -81,8 +81,9 @@ def test_security_headers(client, path):
     assert "'unsafe-inline'" not in csp
 
 
-def test_pages_survive_populated_database(client, app, fixtures_dir):
-    started = client.post(
+def test_pages_survive_populated_database(client, app, fixtures_dir, auth_client):
+    api = auth_client(app)
+    started = api.post(
         "/api/capture/start",
         json={"mode": "pcap", "path": str(fixtures_dir / "port_scan_lab.pcap")},
     )
