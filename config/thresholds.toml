@@ -25,21 +25,23 @@ min_packets_per_target = 10
 
 [detection.suspicious]
 window_seconds = 60
-# R3: attempts to the same (source, destination port).
+# R3: SYNs to one destination port that never received a SYN-ACK.
+# This is the packet-metadata approximation of "repeated failed attempts".
 repeat_attempt_threshold = 15
-# A single busy application should not look like a scanner.
-repeat_min_source_ports = 2
-# R5: connections per window from one source, and the multiple of its own baseline.
-conn_rate_threshold = 60
+# R5: TCP connections per window from one source, and the multiple of its own baseline.
+# 300 per 60s (5/s) is a floor; ordinary browsing stays below it.
+conn_rate_threshold = 300
 conn_rate_multiplier = 3.0
-# R8: SYN packets without a matching SYN-ACK. This is an INFERENCE, not proof.
-half_open_threshold = 20
+conn_baseline_alpha = 0.3
+conn_baseline_min_samples = 3
 # Remote administration and database ports. Dev ports (3000/8080) are
 # deliberately excluded: they are too common to be useful evidence.
 sensitive_ports = [21, 22, 23, 445, 1433, 3306, 3389, 5432, 5900, 6379, 9200, 27017]
 
 [detection.spike]
 window_seconds = 10
+# How many seconds of history to keep for baseline calculations.
+baseline_window_seconds = 300
 # R6: absolute packets-per-second ceiling.
 spike_absolute_pps = 500
 # R7: multiple of the rolling baseline.

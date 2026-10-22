@@ -51,3 +51,25 @@ def packet_factory():
         )
 
     return make
+
+
+@pytest.fixture
+def replay(fixtures_dir):
+    """Run one or more detectors over a fixture PCAP and return candidates."""
+    from netshield.capture.pcap import PcapSource
+
+    def run(name, detectors, final_offset=1.0):
+        source = PcapSource(fixtures_dir / name)
+        source.start()
+        last_ts = 0.0
+        for pkt in source.packets():
+            last_ts = pkt.timestamp
+            for detector in detectors:
+                detector.update(pkt)
+        now = last_ts + final_offset
+        candidates = []
+        for detector in detectors:
+            candidates.extend(detector.flush(now))
+        return candidates
+
+    return run

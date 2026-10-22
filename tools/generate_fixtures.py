@@ -50,7 +50,7 @@ def write_pcap(path: Path, packets: list) -> None:
         writer.close()
 
 
-def normal_traffic(rng: random.Random, seconds: int = 30, pps: float = 12.0) -> list:
+def normal_traffic(rng: random.Random, seconds: int = 30, pps: float = 4.0) -> list:
     """Ordinary-looking browsing traffic: no single source touches many ports."""
     hosts = ["10.0.0.21", "10.0.0.22", "10.0.0.23"]
     web = ["192.0.2.10", "198.51.100.20"]
@@ -79,7 +79,7 @@ def normal_traffic(rng: random.Random, seconds: int = 30, pps: float = 12.0) -> 
 
 def port_scan(rng: random.Random) -> list:
     """One external source probes 60 ports on one internal host."""
-    packets = normal_traffic(rng, seconds=5, pps=8.0)
+    packets = normal_traffic(rng, seconds=5, pps=4.0)
     scanner = "203.0.113.50"
     target = "10.0.0.10"
     for index, port in enumerate(range(20, 80)):
@@ -92,7 +92,7 @@ def port_scan(rng: random.Random) -> list:
 
 def host_sweep(rng: random.Random) -> list:
     """One source touches many hosts, one port each."""
-    packets = normal_traffic(rng, seconds=4, pps=8.0)
+    packets = normal_traffic(rng, seconds=4, pps=4.0)
     scanner = "198.51.100.77"
     for index, last in enumerate(range(1, 41)):
         ts = BASE_TS + 10 + index * 0.05
@@ -102,7 +102,7 @@ def host_sweep(rng: random.Random) -> list:
 
 def traffic_spike(rng: random.Random) -> list:
     """A calm baseline, then a burst that clearly exceeds the absolute ceiling."""
-    packets = normal_traffic(rng, seconds=8, pps=8.0)
+    packets = normal_traffic(rng, seconds=8, pps=4.0)
     burst_start = BASE_TS + 8
     for second in range(2):
         for index in range(600):
@@ -113,15 +113,12 @@ def traffic_spike(rng: random.Random) -> list:
 
 def suspicious_traffic(rng: random.Random) -> list:
     """Repeated attempts to a sensitive admin port + half-open handshakes."""
-    packets = normal_traffic(rng, seconds=4, pps=6.0)
+    packets = normal_traffic(rng, seconds=4, pps=4.0)
     internal = "10.0.0.40"
     server = "10.0.0.60"
     for index in range(30):
         ts = BASE_TS + 6 + index * 0.2
         packets.append(_tcp(internal, server, 50000 + index, 22, "S", ts))
-    for index in range(30):
-        ts = BASE_TS + 14 + index * 0.2
-        packets.append(_tcp(internal, server, 52000 + index, 8081, "S", ts))
     return packets
 
 

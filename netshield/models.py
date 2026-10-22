@@ -22,7 +22,6 @@ RULE_TITLES = {
     "CONN_RATE_ANOMALY": "Unusual connection rate for this source",
     "TRAFFIC_SPIKE": "Traffic rate spike",
     "BASELINE_DEVIATION": "Traffic above rolling baseline",
-    "HALF_OPEN_PATTERN": "Many half-open TCP handshakes (inferred)",
 }
 
 

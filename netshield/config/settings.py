@@ -45,16 +45,17 @@ class PortScanConfig:
 class SuspiciousConfig:
     window_seconds: int = 60
     repeat_attempt_threshold: int = 15
-    repeat_min_source_ports: int = 2
-    conn_rate_threshold: int = 60
+    conn_rate_threshold: int = 300
     conn_rate_multiplier: float = 3.0
-    half_open_threshold: int = 20
+    conn_baseline_alpha: float = 0.3
+    conn_baseline_min_samples: int = 3
     sensitive_ports: tuple[int, ...] = (21, 22, 23, 445, 1433, 3306, 3389, 5432, 5900, 6379, 9200, 27017)
 
 
 @dataclass(frozen=True)
 class SpikeConfig:
     window_seconds: int = 10
+    baseline_window_seconds: int = 300
     spike_absolute_pps: int = 500
     spike_baseline_ratio: float = 3.0
     spike_min_pps: int = 100
@@ -130,14 +131,15 @@ class Settings:
             "suspicious": {
                 "window_seconds": self.suspicious.window_seconds,
                 "repeat_attempt_threshold": self.suspicious.repeat_attempt_threshold,
-                "repeat_min_source_ports": self.suspicious.repeat_min_source_ports,
                 "conn_rate_threshold": self.suspicious.conn_rate_threshold,
                 "conn_rate_multiplier": self.suspicious.conn_rate_multiplier,
-                "half_open_threshold": self.suspicious.half_open_threshold,
+                "conn_baseline_alpha": self.suspicious.conn_baseline_alpha,
+                "conn_baseline_min_samples": self.suspicious.conn_baseline_min_samples,
                 "sensitive_ports": list(self.suspicious.sensitive_ports),
             },
             "spike": {
                 "window_seconds": self.spike.window_seconds,
+                "baseline_window_seconds": self.spike.baseline_window_seconds,
                 "spike_absolute_pps": self.spike.spike_absolute_pps,
                 "spike_baseline_ratio": self.spike.spike_baseline_ratio,
                 "spike_min_pps": self.spike.spike_min_pps,
@@ -226,10 +228,10 @@ def parse_settings(raw: dict) -> Settings:
     suspicious = SuspiciousConfig(
         window_seconds=_positive(_require(sus_raw, "window_seconds", int, "detection.suspicious"), "suspicious.window_seconds"),
         repeat_attempt_threshold=_positive(_require(sus_raw, "repeat_attempt_threshold", int, "detection.suspicious"), "suspicious.repeat_attempt_threshold"),
-        repeat_min_source_ports=_positive(_require(sus_raw, "repeat_min_source_ports", int, "detection.suspicious"), "suspicious.repeat_min_source_ports"),
         conn_rate_threshold=_positive(_require(sus_raw, "conn_rate_threshold", int, "detection.suspicious"), "suspicious.conn_rate_threshold"),
         conn_rate_multiplier=float(_require(sus_raw, "conn_rate_multiplier", (int, float), "detection.suspicious")),
-        half_open_threshold=_positive(_require(sus_raw, "half_open_threshold", int, "detection.suspicious"), "suspicious.half_open_threshold"),
+        conn_baseline_alpha=float(_require(sus_raw, "conn_baseline_alpha", (int, float), "detection.suspicious")),
+        conn_baseline_min_samples=_positive(_require(sus_raw, "conn_baseline_min_samples", int, "detection.suspicious"), "suspicious.conn_baseline_min_samples"),
         sensitive_ports=tuple(sorted(set(ports))),
     )
 
@@ -239,6 +241,7 @@ def parse_settings(raw: dict) -> Settings:
 
     spike = SpikeConfig(
         window_seconds=_positive(_require(spike_raw, "window_seconds", int, "detection.spike"), "spike.window_seconds"),
+        baseline_window_seconds=_positive(_require(spike_raw, "baseline_window_seconds", int, "detection.spike"), "spike.baseline_window_seconds"),
         spike_absolute_pps=_positive(_require(spike_raw, "spike_absolute_pps", int, "detection.spike"), "spike.spike_absolute_pps"),
         spike_baseline_ratio=float(_require(spike_raw, "spike_baseline_ratio", (int, float), "detection.spike")),
         spike_min_pps=_positive(_require(spike_raw, "spike_min_pps", int, "detection.spike"), "spike.spike_min_pps"),
