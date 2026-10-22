@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: netshield
+    runtime: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT wsgi:app
+    envVars:
+      - key: NETSHIELD_DB_PATH
+        value: /tmp/netshield.db
+      - key: NETSHIELD_HOST
+        value: 0.0.0.0
