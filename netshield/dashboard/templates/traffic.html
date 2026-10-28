@@ -2,7 +2,7 @@
 
 {% block title %}Traffic · NetShield{% endblock %}
 {% block page_title %}Traffic{% endblock %}
-{% block page_sub %}Packet metadata the pipeline stored. Payloads and hostnames are never recorded.{% endblock %}
+{% block page_sub %}Recorded packet metadata. Payloads and hostnames are not stored.{% endblock %}
 
 {% block content %}
 <div class="stack">
@@ -51,7 +51,7 @@
     <div class="card-head">
       <div>
         <h2>Packet log</h2>
-        <p class="hint">Newest first. Live view refreshes every five seconds while this tab is visible.</p>
+        <p class="hint">Newest first. Refreshes every five seconds while this tab is visible.</p>
       </div>
       <div class="card-actions">
         <span class="tag" id="trafficMeta">&mdash;</span>
