@@ -432,15 +432,15 @@ your institution's policy allows; add one before redistributing.
 A separate **stateless demo profile** is included for Vercel:
 
 - `public/index.html` — standalone responsive dashboard.
-- `api/index.py` — Flask serverless API with health checks, clearly labelled synthetic demo data, and in-memory PCAP/PCAPNG heuristic analysis.
-- `vercel.json` — rewrites API requests to the Python function.
+- `api/health.py`, `api/demo.py`, `api/analyze.py` — dedicated Flask serverless functions for health, synthetic demo data, and in-memory PCAP/PCAPNG heuristic analysis.
+- `vercel.json` — static root mapping and security headers.
 - Existing `requirements.txt` supplies Flask and Scapy.
 
 ### Deploy to Vercel
 
 1. Import `gayatori-san/netshield` into Vercel.
 2. Use the repository root and let Vercel detect Python from `api/index.py`.
-3. Deploy, then test `/api/health`, **Load synthetic demo**, and a small authorised PCAP file.
+3. Deploy, then test `/api/health`, `/api/demo`, **Load synthetic demo**, and a small authorised PCAP file.
 4. Keep demo PCAP uploads below 2 MB. Check the build log if Vercel's Python runtime or account limits differ.
 
 ### Important difference from the full app
