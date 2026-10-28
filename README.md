@@ -426,3 +426,23 @@ traffic and must only be pointed at traffic the operator is authorized to observ
 
 The code is provided for coursework and review. No license is granted beyond what
 your institution's policy allows; add one before redistributing.
+
+## Vercel deployment profile
+
+A separate **stateless demo profile** is included for Vercel:
+
+- `public/index.html` — standalone responsive dashboard.
+- `api/index.py` — Flask serverless API with health checks, clearly labelled synthetic demo data, and in-memory PCAP/PCAPNG heuristic analysis.
+- `vercel.json` — rewrites API requests to the Python function.
+- Existing `requirements.txt` supplies Flask and Scapy.
+
+### Deploy to Vercel
+
+1. Import `gayatori-san/netshield` into Vercel.
+2. Use the repository root and let Vercel detect Python from `api/index.py`.
+3. Deploy, then test `/api/health`, **Load synthetic demo**, and a small authorised PCAP file.
+4. Keep demo PCAP uploads below 2 MB. Check the build log if Vercel's Python runtime or account limits differ.
+
+### Important difference from the full app
+
+Vercel mode is deliberately **not** the full long-running IDS. It does not start live NIC capture, execute firewall/iptables actions, or persist incidents to SQLite. Serverless filesystem and process memory are not durable. The original local/Render application, Firebase authentication, full detector pipeline, and SQLite-backed history remain in the repository for environments designed for a long-running service. Do not expose the full application as an unauthenticated public API.
