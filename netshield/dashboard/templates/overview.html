@@ -2,7 +2,7 @@
 
 {% block title %}Overview · NetShield{% endblock %}
 {% block page_title %}Overview{% endblock %}
-{% block page_sub %}Live posture of the detection pipeline, recent findings, and capture control.{% endblock %}
+{% block page_sub %}Network activity and recent detections.{% endblock %}
 
 {% block content %}
 <div class="stack">
@@ -35,7 +35,7 @@
       <div class="card-head">
         <div>
           <h2>Traffic timeline</h2>
-          <p class="hint">Packets per second over the most recent buckets. Gap means no traffic.</p>
+          <p class="hint">Packets per second over time.</p>
         </div>
         <div class="card-actions">
           <span class="tag" id="seriesCount">&mdash;</span>
@@ -51,7 +51,7 @@
       <div class="card-head">
         <div>
           <h2>Protocol mix</h2>
-          <p class="hint">Every stored packet, by decoded transport protocol.</p>
+          <p class="hint">Stored packets by protocol.</p>
         </div>
       </div>
       <div class="chart-wrap short">
@@ -67,7 +67,7 @@
       <div class="card-head">
         <div>
           <h2>Recent detections</h2>
-          <p class="hint">Newest first. Open an alert to read the evidence and change its status.</p>
+          <p class="hint">Newest first. Select an alert to view its evidence.</p>
         </div>
         <div class="card-actions">
           <a class="btn btn-sm btn-ghost" href="{{ url_for('ui.alerts') }}">All alerts &rarr;</a>
