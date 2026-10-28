@@ -99,7 +99,7 @@ h1, h2, h3, p { margin: 0; }
   backdrop-filter: blur(8px);
 }
 
-.brand { display: flex; align-items: center; gap: 11px; padding: 2px 8px; }
+.brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px; min-width: 0; }
 .brand-mark {
   width: 36px;
   height: 36px;
@@ -110,7 +110,7 @@ h1, h2, h3, p { margin: 0; }
   background: radial-gradient(circle at 30% 20%, rgba(56, 189, 248, 0.28), rgba(56, 189, 248, 0.04));
   color: var(--accent);
 }
-.brand-name { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+.brand-name { display: block; color: var(--text); font-size: 16px; line-height: 1.2; font-weight: 750; letter-spacing: -0.015em; white-space: nowrap; }\n.brand-sub { display: none; }
 .brand-sub {
   font-family: var(--mono);
   font-size: 9.5px;
