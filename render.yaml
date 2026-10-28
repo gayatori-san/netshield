@@ -1,3 +1,4 @@
+# Restored deployment configuration based on commit eb1e8df.
 services:
   - type: web
     name: netshield
