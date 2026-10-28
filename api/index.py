@@ -13,6 +13,24 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 app.config["MAX_CONTENT_LENGTH"] = 2 * 1024 * 1024
+
+
+class VercelRouteRewrite:
+    """Restore the requested API path after Vercel maps it to this function."""
+
+    def __init__(self, wsgi_app):
+        self.wsgi_app = wsgi_app
+
+    def __call__(self, environ, start_response):
+        if environ.get("PATH_INFO") == "/api/index.py":
+            from urllib.parse import parse_qs
+            route = parse_qs(environ.get("QUERY_STRING", "")).get("route", [""])[0]
+            if route.startswith("/api/") and ".." not in route:
+                environ["PATH_INFO"] = route
+        return self.wsgi_app(environ, start_response)
+
+
+app.wsgi_app = VercelRouteRewrite(app.wsgi_app)
 MAX_PACKETS = 20000
 
 
